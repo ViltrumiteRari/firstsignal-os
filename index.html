@@ -707,889 +707,713 @@
 const SUPABASE_URL = 'https://unjffvoflowbqkbcbmhn.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVuamZmdm9mbG93YnFrYmNibWhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjkxNDksImV4cCI6MjA5NjgwNTE0OX0.hL4S4UrshGdweiQ7apUMnK-iE2lzOgjtvWctzLAOA0c';
 
-// ─── SUPABASE HELPERS ───
-async function sbGet(table, params = '') {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-  });
-  return r.json();
-}
-async function sbInsert(table, data) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-    body: JSON.stringify(data)
-  });
-  return r.json();
-}
-async function sbUpsert(table, data, onConflict) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
-    method: 'POST',
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify(data)
-  });
-  return r.json();
-}
+// ─── SUPABASE ───
+async function sbGet(t,p=''){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?${p}`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`}});return r.json();}
+async function sbInsert(t,d){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}`,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(d)});return r.json();}
+async function sbUpsert(t,d,c){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?on_conflict=${c}`,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});return r.json();}
 
 // ─── STATE ───
-let trades = [];
-let watchlist = [];
-let denylistTickers = ['TMHC','RAMP','GRRR'];
-let chatHistory = [];
-let currentPhase = null;
-let todaySession = null;
+let trades=[], watchlist=[], denylistTickers=['TMHC','RAMP','GRRR'], chatHistory=[], currentPhase=null;
+let lastScanTicker='', lastScanText='', thesisWindow='1w';
 const TODAY = new Date().toISOString().split('T')[0];
 
+// ─── STRIKE STATE (single source of truth) ───
+const SS = { direction:'calls', expiry:'0dte', ticker:'', price:0, scanData:{}, selectedStrike:null, expiryDates:{} };
+
 // ─── CLOCK ───
-function updateClock() {
-  const est = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const h = String(est.getHours()).padStart(2,'0');
-  const m = String(est.getMinutes()).padStart(2,'0');
-  const s = String(est.getSeconds()).padStart(2,'0');
-  document.getElementById('clock').textContent = `${h}:${m}:${s} EST`;
-  const mins = est.getHours()*60 + est.getMinutes();
-  const isWeekday = est.getDay() > 0 && est.getDay() < 6;
-  const isOpen = isWeekday && mins >= 570 && mins < 960;
-  const isPre = isWeekday && mins >= 240 && mins < 570;
-  const el = document.getElementById('market-status');
-  if (isOpen) { el.textContent = 'MARKET OPEN'; el.className = 'status-pill status-live'; }
-  else if (isPre) { el.textContent = 'PRE-MARKET'; el.className = 'status-pill status-premarket'; }
-  else { el.textContent = 'CLOSED'; el.className = 'status-pill status-closed'; }
+function updateClock(){
+  const est=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const h=String(est.getHours()).padStart(2,'0'),m=String(est.getMinutes()).padStart(2,'0'),s=String(est.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent=`${h}:${m}:${s} EST`;
+  const mins=est.getHours()*60+est.getMinutes(),wd=est.getDay()>0&&est.getDay()<6;
+  const isOpen=wd&&mins>=570&&mins<960,isPre=wd&&mins>=240&&mins<570;
+  const el=document.getElementById('market-status');
+  if(isOpen){el.textContent='MARKET OPEN';el.className='status-pill status-live';}
+  else if(isPre){el.textContent='PRE-MARKET';el.className='status-pill status-premarket';}
+  else{el.textContent='CLOSED';el.className='status-pill status-closed';}
   updatePhaseCards(est);
 }
-setInterval(updateClock, 1000);
-updateClock();
+setInterval(updateClock,1000); updateClock();
 
-// ─── SESSION DATE ───
-function updatePhaseCards(est) {
-  const dateStr = est.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
-  document.getElementById('session-date-bar').textContent = dateStr;
-  const mins = est.getHours()*60 + est.getMinutes();
-  const isWeekday = est.getDay() > 0 && est.getDay() < 6;
-
-  // Highlight current phase window
-  const phases = {
-    premarket: { start: 240, end: 570 },
-    market: { start: 570, end: 720 },
-    midmarket: { start: 720, end: 960 },
-    postmarket: { start: 960, end: 1440 }
-  };
-  Object.entries(phases).forEach(([id, range]) => {
-    const tag = document.getElementById(`phase-tag-${id}`);
-    if (!tag) return;
-    const isNow = isWeekday && mins >= range.start && mins < range.end;
-    if (isNow) { tag.textContent = 'NOW'; tag.className = 'phase-tag tag-now'; }
+function updatePhaseCards(est){
+  const dateStr=est.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('session-date-bar').textContent=dateStr;
+  const mins=est.getHours()*60+est.getMinutes(),wd=est.getDay()>0&&est.getDay()<6;
+  const phases={premarket:{start:240,end:570},market:{start:570,end:720},midmarket:{start:720,end:960},postmarket:{start:960,end:1440}};
+  Object.entries(phases).forEach(([id,r])=>{
+    const tag=document.getElementById(`phase-tag-${id}`);
+    if(!tag)return;
+    if(wd&&mins>=r.start&&mins<r.end){tag.textContent='NOW';tag.className='phase-tag tag-now';}
   });
 }
 
 // ─── NAV ───
-function showSection(id, el) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('section-' + id).classList.add('active');
-  if (el) el.classList.add('active');
+function showSection(id,el){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('section-'+id).classList.add('active');
+  if(el)el.classList.add('active');
 }
 
 // ─── PHASE SYSTEM ───
-async function enterPhase(phase) {
-  currentPhase = phase;
-  const labels = { premarket: 'Pre-Market Research', market: 'Market Session', midmarket: 'Mid-Session Check', postmarket: 'Post-Session Review' };
-  const contexts = {
-    premarket: `You are in PRE-MARKET mode. Help scan for setups, research tickers from Finviz unusual volume screen, identify catalysts, suggest optimal strikes, and build the watchlist. Use FirstSignal rules. Ask the user what tickers they're looking at or suggest scanning Finviz first.`,
-    market: `You are in MARKET SESSION mode. The market is open. Help monitor positions, refine thesis, time entries, suggest exits when premium expands. Reference pre-market context. Be concise and fast — this is live trading time.`,
-    midmarket: `You are in MID-SESSION mode. Review any open positions from earlier. Check if thesis is still intact. Look for new setups. Help manage risk. Reference earlier session context.`,
-    postmarket: `You are in POST-SESSION mode. Help log today's trades, review performance, extract lessons from wins and losses, prep tomorrow's watchlist and key catalysts to watch.`
+async function enterPhase(phase){
+  currentPhase=phase;
+  const labels={premarket:'Pre-Market Research',market:'Market Session',midmarket:'Mid-Session Check',postmarket:'Post-Session Review'};
+  const contexts={
+    premarket:`PRE-MARKET mode. Scan for setups, research Finviz tickers, identify catalysts, suggest strikes, build watchlist.`,
+    market:`MARKET SESSION mode. Market open. Help monitor positions, time entries, suggest exits on premium expansion. Be fast.`,
+    midmarket:`MID-SESSION mode. Review open positions, check thesis, find new setups, manage risk.`,
+    postmarket:`POST-SESSION mode. Log trades, review performance, extract lessons, prep tomorrow's watchlist.`
   };
-
-  document.getElementById('workspace-title').textContent = labels[phase];
-  document.getElementById('phase-dot-' + phase).className = 'phase-status-dot active';
-  document.getElementById('phase-tag-' + phase).textContent = 'ACTIVE';
-  document.getElementById('phase-tag-' + phase).className = 'phase-tag tag-now';
-
-  // Save session to Supabase
-  const sessionData = { session_date: TODAY };
-  sessionData[`${phase}_started_at`] = new Date().toISOString();
-  await sbUpsert('sessions', sessionData, 'session_date');
-
-  // Show workspace
-  showSection('workspace', null);
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-
-  // Init chat with phase context
-  chatHistory = [{ role: 'user', content: `[SYSTEM: ${contexts[phase]}] Today is ${TODAY}. My denylist: ${denylistTickers.join(', ')}. My watchlist: ${watchlist.join(', ') || 'empty'}.` }];
-
-  // Clear messages and add greeting
-  const msgs = document.getElementById('chat-messages');
-  msgs.innerHTML = '';
-  const greetings = {
-    premarket: `Pre-market session started.\n\nI'm ready to scan. What are you looking at? Drop tickers or say "run scan" and I'll walk you through Finviz → flow → catalyst → strike selection.`,
-    market: `Market is open. Let's move.\n\nWhat positions are you in? Or drop a ticker and I'll give you a live read against your rules.`,
-    midmarket: `Mid-session check. Halfway through.\n\nWhat's open? I'll help you decide hold vs exit and look for any new setups that emerged this morning.`,
-    postmarket: `Session closed. Time to review.\n\nDrop your trades and I'll help you log them, grade the execution, and prep tomorrow's focus list.`
+  const greetings={
+    premarket:`Pre-market session started.\n\nReady to scan. Drop tickers or say "run scan" and I'll walk you through Finviz → flow → catalyst → strike.`,
+    market:`Market is open. Let's move.\n\nWhat positions are you in? Or drop a ticker for a live read.`,
+    midmarket:`Mid-session check.\n\nWhat's open? Hold vs exit, and any new setups from this morning.`,
+    postmarket:`Session closed. Time to review.\n\nDrop your trades — I'll log them, grade execution, and prep tomorrow's focus list.`
   };
-  appendChatMsg('assistant', greetings[phase]);
+  document.getElementById('workspace-title').textContent=labels[phase];
+  const dot=document.getElementById('phase-dot-'+phase);
+  if(dot){dot.className='phase-status-dot active';}
+  const tag=document.getElementById('phase-tag-'+phase);
+  if(tag){tag.textContent='ACTIVE';tag.className='phase-tag tag-now';}
+  const sd={session_date:TODAY};
+  sd[`${phase}_started_at`]=new Date().toISOString();
+  await sbUpsert('sessions',sd,'session_date');
+  showSection('workspace',null);
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  chatHistory=[{role:'user',content:`[SYSTEM: ${contexts[phase]}] Today: ${TODAY}. Denylist: ${denylistTickers.join(', ')}. Watchlist: ${watchlist.join(', ')||'empty'}. FirstSignal rules apply to all analysis.`}];
+  document.getElementById('chat-messages').innerHTML='';
+  appendChatMsg('assistant',greetings[phase]);
   document.getElementById('chat-input').focus();
 }
 
-function exitWorkspace() {
-  currentPhase = null;
-}
+function exitWorkspace(){currentPhase=null;}
 
-function switchPhase(phase) {
+function switchPhase(phase){
   enterPhase(phase);
-  document.querySelectorAll('.phase-badge').forEach(b => b.classList.remove('active-phase'));
+  document.querySelectorAll('.phase-badge').forEach(b=>b.classList.remove('active-phase'));
   event.currentTarget.classList.add('active-phase');
 }
 
 // ─── CHAT ───
-function appendChatMsg(role, text) {
-  const msgs = document.getElementById('chat-messages');
-  const div = document.createElement('div');
-  div.className = `chat-msg ${role}`;
-  const now = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'America/New_York' });
-  div.innerHTML = `<div class="chat-bubble">${text.replace(/\n/g,'<br>')}</div><div class="chat-meta">${role === 'user' ? 'You' : 'FirstSignal AI'} · ${now} EST</div>`;
+function appendChatMsg(role,text){
+  const msgs=document.getElementById('chat-messages');
+  const div=document.createElement('div');
+  div.className=`chat-msg ${role}`;
+  const now=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'America/New_York'});
+  div.innerHTML=`<div class="chat-bubble">${text.replace(/\n/g,'<br>')}</div><div class="chat-meta">${role==='user'?'You':'FirstSignal AI'} · ${now} EST</div>`;
   msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
+  msgs.scrollTop=msgs.scrollHeight;
 }
 
-async function sendChat() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  appendChatMsg('user', text);
+async function sendChat(){
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim(); if(!text)return;
+  input.value=''; appendChatMsg('user',text);
+  const btn=document.getElementById('chat-send-btn');
+  btn.textContent='...'; btn.style.pointerEvents='none';
+  chatHistory.push({role:'user',content:text});
+  const sys=`You are the FirstSignal trading OS — private Bloomberg terminal for a solo options trader.
+Rules: unusual flow required, pre-move only (<10% intraday), 0DTE $0.02-$0.08, swings $0.40-$0.65, one reload, Kelly sizing, no earnings, SMID cap primary, mega cap near-ATM delta min 0.20 (R21), prior day run filter (R22), exit on premium expansion NOT ITM, always hedge 10%, denylist TMHC/RAMP/GRRR.
+Phase: ${currentPhase||'general'} | Watchlist: ${watchlist.join(', ')||'none'} | Date: ${TODAY}
+Be direct, institutional, no fluff. Always include: thesis, strike range, expiry type, entry range, hedge.`;
+  try{
+    const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({_model:'claude-haiku-4-5-20251001',_useWebSearch:false,model:'claude-haiku-4-5-20251001',max_tokens:1000,system:sys,messages:chatHistory.slice(-10)})});
+    const data=await r.json();
+    const reply=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()||'No response.';
+    chatHistory.push({role:'assistant',content:reply});
+    appendChatMsg('assistant',reply);
+  }catch(err){appendChatMsg('assistant',`Error: ${err.message}`);}
+  btn.textContent='Send'; btn.style.pointerEvents='auto';
+}
 
-  const btn = document.getElementById('chat-send-btn');
-  btn.textContent = '...';
-  btn.style.pointerEvents = 'none';
-
-  chatHistory.push({ role: 'user', content: text });
-
-  const systemPrompt = `You are the FirstSignal trading OS — a private Bloomberg terminal and AI trading assistant for a solo options trader.
-
-FirstSignal Rules:
-- Unusual flow signal required before entry
-- Pre-move only — under 10% intraday move, ideally under 5%
-- 0DTE/short-DTE OTM calls: $0.02–$0.08 entry. Swings: $0.40–$0.65
-- One reload rule. Kelly sizing. No earnings plays.
-- SMID cap primary. Mega cap: near-ATM only, delta min 0.20 (Rule 21)
-- Prior day run filter (Rule 22)
-- Exit on premium expansion — NOT when strike is reached
-- Always hedge — 10% of position in hedge
-- Denylist: TMHC, RAMP, GRRR — hard pass
-
-Current phase: ${currentPhase || 'general'}
-Today: ${TODAY}
-Watchlist: ${watchlist.join(', ') || 'none'}
-
-Be direct, concise, institutional. No fluff. This is a live trading environment. When suggesting trades, always include: thesis, strike range, expiry type, entry range, hedge suggestion.`;
-
-  try {
-    const response = await fetch('/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        _model: 'claude-haiku-4-5-20251001',
-        _useWebSearch: false,
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: chatHistory.slice(-10)
-      })
-    });
-    const data = await response.json();
-    const reply = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
-    chatHistory.push({ role: 'assistant', content: reply });
-    appendChatMsg('assistant', reply);
-  } catch(err) {
-    appendChatMsg('assistant', `Error: ${err.message}`);
-  }
-
-  btn.textContent = 'Send';
-  btn.style.pointerEvents = 'auto';
+// ─── SCAN DEPTH ───
+function getScanDepth(){
+  return {
+    web: document.getElementById('chk-web')?.checked!==false,
+    insider: document.getElementById('chk-insider')?.checked!==false,
+    flow: document.getElementById('chk-flow')?.checked!==false,
+    senator: document.getElementById('chk-senator')?.checked!==false,
+    earnings: document.getElementById('chk-earnings')?.checked||false
+  };
 }
 
 // ─── TICKER SCAN ───
-async function runTickerScan() {
-  const ticker = document.getElementById('scan-ticker').value.toUpperCase().trim();
-  if (!ticker) return;
-  document.getElementById('scan-results').style.display = 'none';
-  document.getElementById('scan-loading').style.display = 'block';
-  const btn = document.getElementById('scan-btn');
-  btn.textContent = '...'; btn.style.pointerEvents = 'none';
-  const phrases = ['CHECKING DENYLIST...','PULLING INSIDER DATA...','ANALYZING FLOW...','STRESS TESTING RULES...','BUILDING VERDICT...'];
-  let pi = 0;
-  const interval = setInterval(() => { document.getElementById('scan-loading-text').textContent = phrases[pi++ % phrases.length]; }, 1200);
-  const isDenied = denylistTickers.includes(ticker);
+async function runTickerScan(){
+  const ticker=document.getElementById('scan-ticker').value.toUpperCase().trim();
+  if(!ticker)return;
+  document.getElementById('scan-results').style.display='none';
+  document.getElementById('strike-selector').style.display='none';
+  document.getElementById('thesis-panel').style.display='none';
+  document.getElementById('scan-loading').style.display='block';
+  document.getElementById('thesis-btn').style.display='none';
+  const btn=document.getElementById('scan-btn');
+  btn.textContent='...'; btn.style.pointerEvents='none';
+  const phrases=['CHECKING DENYLIST...','PULLING INSIDER DATA...','ANALYZING FLOW...','SENATOR TRADES...','BUILDING VERDICT...'];
+  let pi=0;
+  const iv=setInterval(()=>{document.getElementById('scan-loading-text').textContent=phrases[pi++%phrases.length];},1200);
+  const isDenied=denylistTickers.includes(ticker);
+  const depth=getScanDepth();
 
-  try {
-    const response = await fetch('/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        _ticker: ticker,
-        _useCache: true,
-        _useWebSearch: true,
-        _model: 'claude-sonnet-4-6',
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
-        system: `You are the FirstSignal scanner. Analyze tickers against these rules:
+  const depthInstructions=[];
+  if(depth.insider) depthInstructions.push('- Check recent Form 4 insider buying/selling');
+  if(depth.senator) depthInstructions.push('- Check recent senator/congressional trades (Capitol Trades)');
+  if(depth.flow) depthInstructions.push('- Analyze unusual options flow — sweeps, large blocks, OI buildup');
+  if(depth.earnings) depthInstructions.push('- Check upcoming earnings date and proximity risk');
+
+  try{
+    const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      _ticker:ticker,_useCache:true,_useWebSearch:depth.web,_model:'claude-sonnet-4-6',
+      model:'claude-sonnet-4-6',max_tokens:1400,
+      system:`You are the FirstSignal scanner. Analyze ${ticker} against FirstSignal rules:
 - Unusual flow signal required. Pre-move only (<10% intraday, ideally <5%).
 - 0DTE OTM calls $0.02-$0.08. Swings $0.40-$0.65.
 - One reload. Kelly sizing. No earnings. SMID cap primary.
-- Mega cap: near-ATM, delta min 0.20 (Rule 21). Prior day run check (Rule 22).
-- Exit on premium expansion. Always hedge at 10%.
-- Denylist: TMHC, RAMP, GRRR.
+- Mega cap: near-ATM delta min 0.20 (Rule 21). Prior day run check (Rule 22).
+- Exit on premium expansion NOT ITM. Hedge at 10%.
+- Denylist: TMHC, RAMP, GRRR — hard NO-GO.
 
-Return EXACTLY this format:
+Additional checks requested:
+${depthInstructions.join('\n')||'- Basic price action and technicals only'}
+
+Return EXACTLY this format (no markdown, no asterisks):
 TICKER: [ticker]
+PRICE: [$current price]
 STATUS: [GO / NO-GO / WATCHLIST]
-INTRADAY MOVE: [%]
-PRIOR DAY: [notable move?]
+INTRADAY MOVE: [% today]
+PRIOR DAY: [prior day move]
 DENYLIST: [YES / NO]
-INSIDER ACTIVITY: [recent Form 4 activity]
-FLOW SIGNALS: [unusual options activity]
-TECHNICALS: [MA relationship, setup]
-THESIS: [1-2 sentences]
-SUGGESTED STRIKE RANGE: [specific range or NOT APPLICABLE]
-HEDGE SUGGESTION: [specific hedge play at 10% size]
-VERDICT: [1 sentence]`,
-        messages: [{ role: 'user', content: `Analyze ${ticker} right now.${isDenied ? ' THIS TICKER IS ON THE DENYLIST — immediate NO-GO.' : ''} Search for current data.` }]
-      })
-    });
-    const data = await response.json();
-    clearInterval(interval);
+INSIDER ACTIVITY: [recent Form 4 — buys or sells, names, amounts]
+SENATOR TRADES: [recent congressional trades on this ticker if any]
+FLOW SIGNALS: [unusual options activity — sweeps, blocks, OI]
+TECHNICALS: [above/below 50MA and 200MA, momentum]
+THESIS: [2-3 sentences on the setup]
+SUGGESTED STRIKE RANGE: [specific $ range or NOT APPLICABLE]
+HEDGE SUGGESTION: [specific opposite play at 10% of position]
+VETO FLAGS: [list any specific FirstSignal rules that are violated and why]
+VERDICT: [1 sentence final call]`,
+      messages:[{role:'user',content:`Analyze ${ticker} now.${isDenied?' DENYLIST — immediate NO-GO.':''} Today: ${TODAY}.`}]
+    })});
+    const data=await r.json();
+    clearInterval(iv);
+    const text=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()||'No response.';
 
-    // Show cache notice if served from cache
-    if (data._cached) {
-      const cacheAge = Math.round((Date.now() - new Date(data._cached_at).getTime()) / 60000);
-      document.getElementById('scan-output').dataset.cacheNotice = `Cached ${cacheAge}m ago — `;
-    } else {
-      delete document.getElementById('scan-output').dataset.cacheNotice;
+    // Extract live price
+    const priceMatch=text.match(/^PRICE: \$?([\d.]+)/m);
+    if(priceMatch){
+      document.getElementById('scan-live-price').textContent=`$${parseFloat(priceMatch[1]).toFixed(2)}`;
+      SS.price=parseFloat(priceMatch[1]);
     }
-    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
-    const colorized = text
-      .replace(/^(STATUS: )(GO)$/m, '$1<span style="color:var(--accent);font-weight:600;">$2 ✓</span>')
-      .replace(/^(STATUS: )(NO-GO)$/m, '$1<span style="color:var(--danger);font-weight:600;">$2 ✗</span>')
-      .replace(/^(STATUS: )(WATCHLIST)$/m, '$1<span style="color:var(--warn);font-weight:600;">$2 ◎</span>')
-      .replace(/^(TICKER:|INTRADAY MOVE:|PRIOR DAY:|DENYLIST:|INSIDER ACTIVITY:|FLOW SIGNALS:|TECHNICALS:|THESIS:|SUGGESTED STRIKE RANGE:|HEDGE SUGGESTION:|VERDICT:)/gm, '<span style="color:var(--text-muted);">$1</span>');
-    document.getElementById('scan-output').innerHTML = colorized;
-    document.getElementById('scan-loading').style.display = 'none';
-    document.getElementById('scan-results').style.display = 'block';
 
-    // Save scan to Supabase
-    const verdict = text.match(/STATUS: (GO|NO-GO|WATCHLIST)/)?.[1] || null;
-    await sbInsert('scans', { ticker, verdict, raw_output: text, phase: currentPhase, session_date: TODAY });
+    const colorized=text
+      .replace(/^(STATUS: )(GO)$/m,'$1<span style="color:var(--accent);font-weight:600;">$2 ✓</span>')
+      .replace(/^(STATUS: )(NO-GO)$/m,'$1<span style="color:var(--danger);font-weight:600;">$2 ✗</span>')
+      .replace(/^(STATUS: )(WATCHLIST)$/m,'$1<span style="color:var(--warn);font-weight:600;">$2 ◎</span>')
+      .replace(/^(TICKER:|PRICE:|INTRADAY MOVE:|PRIOR DAY:|DENYLIST:|INSIDER ACTIVITY:|SENATOR TRADES:|FLOW SIGNALS:|TECHNICALS:|THESIS:|SUGGESTED STRIKE RANGE:|HEDGE SUGGESTION:|VETO FLAGS:|VERDICT:)/gm,'<span style="color:var(--text-muted);">$1</span>');
+    document.getElementById('scan-output').innerHTML=colorized;
+    document.getElementById('scan-loading').style.display='none';
+    document.getElementById('scan-results').style.display='block';
+    document.getElementById('thesis-btn').style.display='inline-block';
 
-    // Store for watchlist add
-    document.getElementById('scan-add-watchlist').dataset.ticker = ticker;
-    document.getElementById('scan-add-watchlist').dataset.verdict = verdict;
-
-    // Store for thesis
-    lastScanTicker = ticker;
-    lastScanText = text;
-
-    // Init strike selector with scan data
-    initStrikeSelector(ticker, text);
-  } catch(err) {
-    clearInterval(interval);
-    document.getElementById('scan-output').textContent = `Scan failed: ${err.message}`;
-    document.getElementById('scan-loading').style.display = 'none';
-    document.getElementById('scan-results').style.display = 'block';
+    const verdict=text.match(/^STATUS: (GO|NO-GO|WATCHLIST)/m)?.[1]||null;
+    await sbInsert('scans',{ticker,verdict,raw_output:text,phase:currentPhase,session_date:TODAY});
+    document.getElementById('scan-add-watchlist').dataset.ticker=ticker;
+    lastScanTicker=ticker; lastScanText=text;
+    initStrikeSelector(ticker,text);
+  }catch(err){
+    clearInterval(iv);
+    document.getElementById('scan-output').textContent=`Scan failed: ${err.message}`;
+    document.getElementById('scan-loading').style.display='none';
+    document.getElementById('scan-results').style.display='block';
   }
-  btn.textContent = '▶ Scan'; btn.style.pointerEvents = 'auto';
+  btn.textContent='▶ Scan'; btn.style.pointerEvents='auto';
 }
 
-document.getElementById('scan-ticker').addEventListener('keydown', e => { if (e.key === 'Enter') runTickerScan(); });
+document.getElementById('scan-ticker').addEventListener('keydown',e=>{if(e.key==='Enter')runTickerScan();});
+
+function clearScan(){
+  document.getElementById('scan-results').style.display='none';
+  document.getElementById('strike-selector').style.display='none';
+  document.getElementById('thesis-panel').style.display='none';
+}
 
 // ─── WATCHLIST ───
-function addScanToWatchlist() {
-  const btn = document.getElementById('scan-add-watchlist');
-  const ticker = btn.dataset.ticker;
-  const verdict = btn.dataset.verdict;
-  if (!ticker || watchlist.includes(ticker)) return;
-  watchlist.push(ticker);
-  renderWatchlist();
+function addScanToWatchlist(){
+  const ticker=document.getElementById('scan-add-watchlist').dataset.ticker;
+  if(!ticker||watchlist.includes(ticker))return;
+  watchlist.push(ticker); renderWatchlist();
 }
 
-function renderWatchlist() {
-  const panel = document.getElementById('watchlist-panel');
-  if (!watchlist.length) { panel.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Empty — scan tickers to populate.</div>'; return; }
-  panel.innerHTML = watchlist.map(t => `<span style="font-family:var(--mono);font-size:10px;padding:3px 8px;background:var(--accent-dim);border:1px solid rgba(0,229,160,0.2);color:var(--accent);border-radius:2px;cursor:pointer;" onclick="quickScan('${t}')">${t}</span>`).join('');
+function renderWatchlist(){
+  const p=document.getElementById('watchlist-panel');
+  if(!watchlist.length){p.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Empty — scan tickers to populate.</div>';return;}
+  p.innerHTML=watchlist.map(t=>`<span style="font-family:var(--mono);font-size:10px;padding:3px 8px;background:var(--accent-dim);border:1px solid rgba(0,229,160,0.2);color:var(--accent);border-radius:2px;cursor:pointer;" onclick="quickScan('${t}')">${t}</span>`).join('');
 }
 
-function quickScan(ticker) {
-  document.getElementById('scan-ticker').value = ticker;
-  showSection('scanner', null);
-  runTickerScan();
+function quickScan(ticker){
+  document.getElementById('scan-ticker').value=ticker;
+  showSection('scanner',null); runTickerScan();
 }
-
-// ─── TRADE LOG ───
-async function loadTrades() {
-  const data = await sbGet('trades', `session_date=eq.${TODAY}&order=created_at.desc`);
-  if (Array.isArray(data)) { trades = data; renderLog(); updateStats(); }
-}
-
-function showAddTrade() { document.getElementById('add-trade-form').style.display = 'block'; }
-function hideAddTrade() { document.getElementById('add-trade-form').style.display = 'none'; }
-
-async function addTrade() {
-  const ticker = document.getElementById('t-ticker').value.toUpperCase().trim();
-  const strike = document.getElementById('t-strike').value.trim();
-  const entry_price = parseFloat(document.getElementById('t-entry').value) || null;
-  const result = document.getElementById('t-result').value.trim();
-  const status = document.getElementById('t-status').value;
-  const notes = document.getElementById('t-note').value.trim();
-  if (!ticker) return;
-
-  const result_pct = result ? parseFloat(result.replace('%','').replace('+','')) : null;
-  const trade = { ticker, strike, entry_price, result_pct, status, notes, phase: currentPhase, session_date: TODAY };
-  await sbInsert('trades', trade);
-  ['t-ticker','t-strike','t-entry','t-result','t-note'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('t-status').value = 'open';
-  hideAddTrade();
-  await loadTrades();
-}
-
-function logTradeFromWorkspace() { showSection('log', null); showAddTrade(); }
-
-function renderLog(filter = 'all') {
-  const filtered = filter === 'all' ? trades : trades.filter(t => t.status === filter);
-  const list = document.getElementById('signal-log-list');
-  list.innerHTML = filtered.length ? filtered.map(t => `
-    <div class="signal-entry">
-      <div class="signal-top">
-        <span class="signal-ticker">${t.ticker}</span>
-        <span class="signal-result ${t.status}">${t.result_pct != null ? (t.result_pct > 0 ? '+' : '') + t.result_pct + '%' : t.status.toUpperCase()}</span>
-      </div>
-      <div class="signal-meta">${t.strike ? t.strike + ' · ' : ''}${t.entry_price ? 'Entry $' + t.entry_price + ' · ' : ''}${new Date(t.created_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>
-      ${t.notes ? `<div class="signal-note">${t.notes}</div>` : ''}
-    </div>`).join('') : '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:12px 0;">No entries.</div>';
-
-  // Recent signals panel
-  const recent = document.getElementById('recent-signals');
-  recent.innerHTML = trades.slice(0,5).map(t => `
-    <div class="signal-entry">
-      <div class="signal-top"><span class="signal-ticker">${t.ticker}</span><span class="signal-result ${t.status}">${t.result_pct != null ? (t.result_pct>0?'+':'')+t.result_pct+'%' : t.status.toUpperCase()}</span></div>
-      <div class="signal-meta">${new Date(t.created_at).toLocaleDateString()}</div>
-    </div>`).join('') || '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals yet.</div>';
-}
-
-function updateStats() {
-  const wins = trades.filter(t => t.status === 'win').length;
-  const losses = trades.filter(t => t.status === 'loss').length;
-  const closed = wins + losses;
-  document.getElementById('stat-trades').textContent = trades.length;
-  document.getElementById('stat-wins').textContent = wins;
-  document.getElementById('stat-losses').textContent = losses;
-  const wr = closed ? Math.round(wins/closed*100)+'%' : '—';
-  const wrEl = document.getElementById('stat-winrate');
-  wrEl.textContent = wr;
-  wrEl.className = 'stat-val' + (closed ? (wins/closed >= 0.5 ? ' up' : ' down') : '');
-}
-
-// ─── DENYLIST ───
-async function loadDenylist() {
-  const data = await sbGet('denylist', 'order=created_at.asc');
-  if (Array.isArray(data) && data.length) {
-    denylistTickers = data.map(d => d.ticker);
-    renderDenylist(data);
-  } else { renderDenylist(denylistTickers.map(t => ({ ticker: t, reason: 'Signal corruption confirmed' }))); }
-}
-
-function renderDenylist(items) {
-  document.getElementById('denylist-container').innerHTML = items.map(d =>
-    `<div class="deny-ticker">${d.ticker} <span class="deny-reason">${d.reason || ''}</span></div>`).join('');
-}
-
-function showDenyAdd() { document.getElementById('deny-add-row').style.display = 'flex'; document.getElementById('deny-input').focus(); }
-
-async function confirmDeny() {
-  const ticker = document.getElementById('deny-input').value.toUpperCase().trim();
-  const reason = document.getElementById('deny-reason-input').value.trim() || 'Signal corruption';
-  if (!ticker) return;
-  await sbInsert('denylist', { ticker, reason });
-  document.getElementById('deny-input').value = '';
-  document.getElementById('deny-reason-input').value = '';
-  document.getElementById('deny-add-row').style.display = 'none';
-  await loadDenylist();
-}
-
-// ─── MACRO TICKER TAPE (free — no Claude calls) ───
-async function fetchMacroTape() {
-  try {
-    const r = await fetch('/api/tape');
-    if (!r.ok) return;
-    const json = await r.json();
-    const syms = ['SPY','QQQ','VIX','TLT','IWM'];
-    syms.forEach(sym => {
-      if (!json[sym]) return;
-      const { price, chg, up } = json[sym];
-      const cls = `tape-chg ${up ? 'up' : 'down'}`;
-      ['','2'].forEach(sfx => {
-        const pe = document.getElementById(`t-${sym}-p${sfx}`);
-        const ce = document.getElementById(`t-${sym}-c${sfx}`);
-        if (pe) pe.textContent = price;
-        if (ce) { ce.textContent = chg; ce.className = cls; }
-      });
-    });
-  } catch(e) { console.log('Tape fetch failed:', e.message); }
-}
-
-// ─── ADD RULE ───
-let ruleCount = 23;
-function addRule() {
-  const text = prompt('New rule text:');
-  if (!text) return;
-  const grid = document.getElementById('rules-grid');
-  const el = document.createElement('div');
-  el.className = 'rule-item';
-  el.innerHTML = `<span class="rule-num">R-${String(ruleCount).padStart(2,'0')}</span><span class="rule-text">${text}</span>`;
-  grid.appendChild(el);
-  ruleCount++;
-}
-
-// ─── INIT ───
-async function init() {
-  await Promise.all([loadTrades(), loadDenylist()]);
-  renderLog();
-  updateStats();
-  fetchMacroTape();
-  setInterval(fetchMacroTape, 60000);
-  // STW feed — loads silently, shows "no bot token" message if not configured
-  loadSTWFeed();
-  setInterval(loadSTWFeed, 120000);
-}
-
-init();
-
-// ─── SCAN DEPTH SYSTEM ───
-function getScanInstructions() {
-  const web = document.getElementById('chk-web')?.checked;
-  const insider = document.getElementById('chk-insider')?.checked;
-  const flow = document.getElementById('chk-flow')?.checked;
-  const senator = document.getElementById('chk-senator')?.checked;
-  const earnings = document.getElementById('chk-earnings')?.checked;
-  const parts = [];
-  if (insider) parts.push('- Check recent Form 4 insider buying/selling activity');
-  if (senator) parts.push('- Check recent senator/congressional trades via Capitol Trades');
-  if (flow) parts.push('- Analyze unusual options flow — sweeps, large blocks, OI buildup');
-  if (earnings) parts.push('- Check upcoming earnings date and proximity risk');
-  if (!insider && !senator && !flow) parts.push('- Quick scan: technicals and price action only');
-  return { useWebSearch: web, instructions: parts.join('\n') };
-}
-
-function clearScan() {
-  document.getElementById('scan-results').style.display = 'none';
-  document.getElementById('strike-selector').style.display = 'none';
-  document.getElementById('thesis-panel').style.display = 'none';
-}
-
-// ─── LIVE PRICE IN SCANNER ───
-async function fetchLivePrice(ticker) {
-  try {
-    const r = await fetch(`/api/tape`);
-    const d = await r.json();
-    // tape only has macro symbols — for individual tickers use FMP
-    const r2 = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${ticker}?apikey=${window._fmpKey||''}`);
-    const d2 = await r2.json();
-    if (Array.isArray(d2) && d2[0]) {
-      const price = d2[0].price;
-      const el = document.getElementById('scan-live-price');
-      if (el) el.textContent = `$${price?.toFixed(2)}`;
-      return price;
-    }
-  } catch {}
-  return null;
-}
-
-// Update scan to use depth checkboxes and fetch live price
-const _origRunScan = runTickerScan;
 
 // ─── REAL EXPIRY DATES ───
-function getRealExpiryDates() {
-  const now = new Date();
-  const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const dates = [];
-  // Find next N Fridays (options expiry)
-  let d = new Date(est);
-  d.setHours(0,0,0,0);
-  for (let i = 0; dates.length < 6; i++) {
-    d.setDate(d.getDate() + 1);
-    if (d.getDay() === 5) { // Friday
-      dates.push(new Date(d));
-    }
-  }
-  const fmt = (dt) => dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
-  const isToday = (dt) => dt.toDateString() === est.toDateString();
-  const isFriday = est.getDay() === 5;
-
+function getRealExpiryDates(){
+  const est=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const fridays=[];
+  const d=new Date(est); d.setHours(0,0,0,0);
+  while(fridays.length<6){d.setDate(d.getDate()+1);if(d.getDay()===5)fridays.push(new Date(d));}
+  const fmt=dt=>dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const isFri=est.getDay()===5;
+  const todayFmt=est.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  // Monthly = 3rd Friday of next month
+  const monthly=fridays.find(d=>d.getDate()>=15&&d.getDate()<=21)||fridays[3];
   return {
-    '0dte': isFriday ? `${fmt(est)} (Today)` : `${fmt(dates[0])} (Fri)`,
-    'week': fmt(dates[0]),
-    '2week': fmt(dates[1]),
-    'monthly': fmt(dates.find(d => d.getDate() >= 15 && d.getDate() <= 21) || dates[3])
+    '0dte': isFri?`${todayFmt} (Today)`:`${fmt(fridays[0])} (Fri)`,
+    'week': fmt(fridays[0]),
+    '2week': fmt(fridays[1]),
+    'monthly': fmt(monthly)
   };
 }
 
-// Override initStrikeSelector to use real dates
-const _origInitStrike = initStrikeSelector;
-function initStrikeSelector(ticker, scanText) {
-  const dates = getRealExpiryDates();
-  // Update expiry button labels with real dates
-  document.getElementById('exp-0dte').textContent = `0DTE · ${dates['0dte']}`;
-  document.getElementById('exp-week').textContent = `Week · ${dates['week']}`;
-  document.getElementById('exp-2week').textContent = `2Wk · ${dates['2week']}`;
-  document.getElementById('exp-monthly').textContent = `Monthly · ${dates['monthly']}`;
+// ─── STRIKE SELECTOR ───
+function initStrikeSelector(ticker,scanText){
+  const dates=getRealExpiryDates();
+  SS.expiryDates=dates;
+  SS.ticker=ticker;
+  SS.selectedStrike=null;
 
-  strikeState.ticker = ticker;
-  strikeState.expiryDates = dates;
+  // Update expiry buttons with real dates
+  document.getElementById('exp-0dte').textContent=`0DTE · ${dates['0dte']}`;
+  document.getElementById('exp-week').textContent=`Week · ${dates['week']}`;
+  document.getElementById('exp-2week').textContent=`2Wk · ${dates['2week']}`;
+  document.getElementById('exp-monthly').textContent=`Monthly · ${dates['monthly']}`;
 
-  // Try to get live price first
-  fetchLivePrice(ticker).then(livePrice => {
-    const priceMatch = scanText.match(/\$(\d+\.?\d*)/);
-    strikeState.price = livePrice || (priceMatch ? parseFloat(priceMatch[1]) : 100);
-    strikeState.scanData = parseScanData(scanText);
-    strikeState.direction = strikeState.scanData.verdict === 'NO-GO' ? 'puts' : 'calls';
-    document.getElementById('strike-selector').style.display = 'block';
-    document.getElementById('thesis-btn').style.display = 'inline-block';
-    renderStrikeGrid();
-    updateDirectionUI();
-  });
-}
+  // Parse scan data
+  SS.scanData=parseScanData(scanText);
 
-// ─── THESIS ANALYSIS ───
-let thesisWindow = '1w';
-let lastScanText = '';
-let lastScanTicker = '';
-
-function setThesisWindow(w) {
-  thesisWindow = w;
-  document.getElementById('thesis-1w').className = w === '1w' ? 'expiry-btn active-expiry' : 'expiry-btn';
-  document.getElementById('thesis-3w').className = w === '3w' ? 'expiry-btn active-expiry' : 'expiry-btn';
-  if (lastScanText) runThesisAnalysis();
-}
-
-async function runThesisAnalysis() {
-  if (!lastScanTicker || !lastScanText) return;
-  document.getElementById('thesis-panel').style.display = 'block';
-  document.getElementById('thesis-ticker-label').textContent = lastScanTicker;
-  document.getElementById('thesis-loading').style.display = 'block';
-  document.getElementById('thesis-content').style.display = 'none';
-  document.getElementById('thesis-verdict').style.display = 'none';
-
-  const windowLabel = thesisWindow === '1w' ? '1 week (0DTE through weekly options)' : '3 weeks (weekly through monthly options)';
-
-  try {
-    const r = await fetch('/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        _model: 'claude-sonnet-4-6',
-        _useWebSearch: document.getElementById('chk-web')?.checked,
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
-        system: `You are a FirstSignal trade thesis analyst. Given a scan result, argue both sides (bullish vs bearish) for options plays within the specified timeframe, then give a consensus verdict.
-
-Format EXACTLY:
-TIMEFRAME: [window]
-CURRENT PRICE: [price]
-
-BULL CASE (CALLS):
-[3-4 specific reasons to buy calls — catalyst, flow, technicals, insider activity, senator trades]
-
-BEAR CASE (PUTS):  
-[3-4 specific reasons to buy puts — risks, resistance, insider sells, red flags]
-
-CONSENSUS: [CALLS / PUTS / WAIT]
-CONVICTION: [HIGH / MEDIUM / LOW]
-OPTIMAL STRIKE: [specific strike recommendation]
-OPTIMAL EXPIRY: [specific date]
-ENTRY RANGE: [premium range]
-HEDGE: [opposite play at 10% size]
-REASONING: [1-2 sentences on why consensus wins]`,
-        messages: [{ role: 'user', content: `Here is my scan data for ${lastScanTicker}:\n\n${lastScanText}\n\nBuild a trade thesis for a ${windowLabel} window. Include senator trades and insider activity in your analysis. Current date: ${TODAY}.` }]
-      })
-    });
-    const data = await r.json();
-    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
-
-    const consensus = text.match(/CONSENSUS: (CALLS|PUTS|WAIT)/)?.[1];
-    const conviction = text.match(/CONVICTION: (HIGH|MEDIUM|LOW)/)?.[1];
-
-    const colored = text
-      .replace(/^(BULL CASE.*:)/m, '<span style="color:var(--accent);font-weight:600;">$1</span>')
-      .replace(/^(BEAR CASE.*:)/m, '<span style="color:var(--danger);font-weight:600;">$1</span>')
-      .replace(/^(CONSENSUS:|CONVICTION:|OPTIMAL STRIKE:|OPTIMAL EXPIRY:|ENTRY RANGE:|HEDGE:|REASONING:|TIMEFRAME:|CURRENT PRICE:)/gm, '<span style="color:var(--text-muted);">$1</span>');
-
-    document.getElementById('thesis-content').innerHTML = colored;
-    document.getElementById('thesis-content').style.display = 'block';
-    document.getElementById('thesis-loading').style.display = 'none';
-
-    // Big verdict
-    if (consensus) {
-      const color = consensus === 'CALLS' ? 'var(--accent)' : consensus === 'PUTS' ? 'var(--danger)' : 'var(--warn)';
-      const convColor = conviction === 'HIGH' ? color : conviction === 'MEDIUM' ? 'var(--warn)' : 'var(--text-muted)';
-      document.getElementById('thesis-verdict').innerHTML = `
-        <div style="display:flex;align-items:center;gap:16px;">
-          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${color};">${consensus}</div>
-          <div>
-            <div style="font-family:var(--mono);font-size:11px;color:${convColor};font-weight:600;">${conviction || '—'} CONVICTION</div>
-            <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:2px;">${thesisWindow === '1w' ? '1-Week' : '3-Week'} Window</div>
-          </div>
-        </div>`;
-      document.getElementById('thesis-verdict').style.display = 'block';
-    }
-  } catch(err) {
-    document.getElementById('thesis-content').textContent = `Error: ${err.message}`;
-    document.getElementById('thesis-content').style.display = 'block';
-    document.getElementById('thesis-loading').style.display = 'none';
+  // Price: prefer already extracted, fallback to scan text
+  if(!SS.price||SS.price===0){
+    const pm=scanText.match(/PRICE: \$?([\d.]+)/);
+    SS.price=pm?parseFloat(pm[1]):100;
   }
-}
 
-// ─── STW DISCORD FEED ───
-const STW_CHANNEL = '1330108200594309120';
+  // Auto-direction from verdict
+  SS.direction=SS.scanData.verdict==='NO-GO'?'puts':'calls';
 
-async function loadSTWFeed() {
-  const el = document.getElementById('stw-feed');
-  el.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Loading...</div>';
-  try {
-    const r = await fetch('/api/discord', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel_id: STW_CHANNEL, limit: 10 })
-    });
-    const data = await r.json();
-    if (data.error || !data.messages?.length) {
-      el.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">No bot token configured — add DISCORD_BOT_TOKEN to Vercel env vars.</div>';
-      return;
-    }
-    el.innerHTML = data.messages.slice(0,8).map(m => {
-      const time = new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'America/New_York'});
-      const content = m.content?.slice(0,80) || '';
-      // highlight tickers
-      const highlighted = content.replace(/\b([A-Z]{2,5})\b/g, (match) =>
-        match.length >= 2 && match.length <= 5 ? `<span style="color:var(--accent);cursor:pointer;" onclick="quickScan('${match}')">${match}</span>` : match
-      );
-      return `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;">
-        <div style="color:var(--text-dim);margin-bottom:2px;">${m.author} · ${time}</div>
-        <div style="color:var(--text);line-height:1.4;">${highlighted}</div>
-      </div>`;
-    }).join('');
-  } catch(err) {
-    el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${err.message}</div>`;
-  }
-}
-
-// Store scan data for thesis
-const _origScanStore = (ticker, text) => {
-  lastScanTicker = ticker;
-  lastScanText = text;
-};
-let strikeState = { direction: 'calls', expiry: '0dte', ticker: '', price: 0, scanData: {} };
-
-function initStrikeSelector(ticker, scanText) {
-  strikeState.ticker = ticker;
-  // Parse price from scan output or estimate
-  const priceMatch = scanText.match(/\$(\d+\.?\d*)/);
-  strikeState.price = priceMatch ? parseFloat(priceMatch[1]) : 100;
-  strikeState.scanData = parseScanData(scanText);
-  strikeState.direction = strikeState.scanData.verdict === 'NO-GO' ? 'puts' : 'calls';
-
-  document.getElementById('strike-selector').style.display = 'block';
+  document.getElementById('strike-selector').style.display='block';
   renderStrikeGrid();
   updateDirectionUI();
+  document.getElementById('strike-rating').style.display='none';
+  document.getElementById('metric-bars').style.display='none';
 }
 
-function parseScanData(text) {
-  const get = (key) => { const m = text.match(new RegExp(key + ':\\s*(.+)')); return m ? m[1].trim() : ''; };
-  return {
-    verdict: get('STATUS').replace(/[^A-Z-]/g,''),
-    intradayMove: parseFloat(get('INTRADAY MOVE')) || 0,
-    flow: get('FLOW SIGNALS'),
-    technicals: get('TECHNICALS'),
-    thesis: get('THESIS'),
-    insider: get('INSIDER ACTIVITY'),
-  };
+function parseScanData(text){
+  const get=key=>{const m=text.match(new RegExp(`^${key}:\\s*(.+)$`,'m'));return m?m[1].trim():'';};
+  const verdict=(text.match(/^STATUS: (GO|NO-GO|WATCHLIST)/m)||[])[1]||'';
+  const intradayStr=get('INTRADAY MOVE');
+  const intradayMove=parseFloat(intradayStr.replace(/[^0-9.-]/g,''))||0;
+  const vetoFlags=get('VETO FLAGS');
+  return {verdict,intradayMove,flow:get('FLOW SIGNALS'),technicals:get('TECHNICALS'),thesis:get('THESIS'),insider:get('INSIDER ACTIVITY'),senator:get('SENATOR TRADES'),vetoFlags};
 }
 
-function setDirection(dir) {
-  strikeState.direction = dir;
+function setDirection(dir){
+  SS.direction=dir;
   updateDirectionUI();
-  if (strikeState.selectedStrike) renderRating(strikeState.selectedStrike);
+  if(SS.selectedStrike)renderRating(SS.selectedStrike);
 }
 
-function updateDirectionUI() {
-  const isCall = strikeState.direction === 'calls';
-  const callEl = document.getElementById('dir-calls');
-  const putEl = document.getElementById('dir-puts');
-  callEl.style.background = isCall ? 'var(--accent-dim)' : 'transparent';
-  callEl.querySelector('div').style.color = isCall ? 'var(--accent)' : 'var(--text-muted)';
-  callEl.querySelector('div:last-child').style.color = isCall ? 'var(--accent)' : 'var(--text-muted)';
-  putEl.style.background = !isCall ? 'rgba(229,64,64,0.08)' : 'transparent';
-  putEl.querySelector('div').style.color = !isCall ? 'var(--danger)' : 'var(--text-muted)';
-  putEl.querySelector('div:last-child').style.color = !isCall ? 'var(--danger)' : 'var(--text-muted)';
+function updateDirectionUI(){
+  const isCall=SS.direction==='calls';
+  const ce=document.getElementById('dir-calls'),pe=document.getElementById('dir-puts');
+  ce.style.background=isCall?'var(--accent-dim)':'transparent';
+  ce.children[0].style.color=isCall?'var(--accent)':'var(--text-muted)';
+  ce.children[1].style.color=isCall?'var(--accent)':'var(--text-muted)';
+  pe.style.background=!isCall?'rgba(229,64,64,0.08)':'transparent';
+  pe.children[0].style.color=!isCall?'var(--danger)':'var(--text-muted)';
+  pe.children[1].style.color=!isCall?'var(--danger)':'var(--text-muted)';
   renderStrikeGrid();
 }
 
-function setExpiry(exp) {
-  strikeState.expiry = exp;
-  document.querySelectorAll('.expiry-btn').forEach(b => b.classList.remove('active-expiry'));
+function setExpiry(exp){
+  SS.expiry=exp;
+  document.querySelectorAll('.expiry-btn').forEach(b=>b.classList.remove('active-expiry'));
   document.getElementById(`exp-${exp}`).classList.add('active-expiry');
-  if (strikeState.selectedStrike) renderRating(strikeState.selectedStrike);
+  if(SS.selectedStrike)renderRating(SS.selectedStrike);
 }
 
-function renderStrikeGrid() {
-  const price = strikeState.price;
-  const step = price < 20 ? 0.5 : price < 50 ? 1 : price < 100 ? 2 : price < 200 ? 5 : price < 500 ? 10 : 25;
-  const atm = Math.round(price / step) * step;
-  const strikes = [];
-  for (let i = -4; i <= 4; i++) strikes.push(+(atm + i * step).toFixed(2));
+function renderStrikeGrid(){
+  const price=SS.price||100;
+  // Dynamic step based on price
+  const step=price<10?0.5:price<25?1:price<50?2:price<100?2.5:price<200?5:price<500?10:price<1000?25:50;
+  const atm=Math.round(price/step)*step;
+  // Generate strikes: 4 below ATM, ATM, 4 above
+  const strikes=[];
+  for(let i=-4;i<=4;i++) strikes.push(+(atm+i*step).toFixed(2));
 
-  const grid = document.getElementById('strike-grid');
-  const isCall = strikeState.direction === 'calls';
-  grid.innerHTML = strikes.map(s => {
-    const isAtm = Math.abs(s - price) < step * 0.6;
-    const isOtm = isCall ? s > price : s < price;
-    const cls = `strike-btn${isAtm ? ' atm' : ''}`;
-    const label = `$${s}${isAtm ? ' ≈ATM' : isOtm ? ' OTM' : ' ITM'}`;
+  const grid=document.getElementById('strike-grid');
+  const isCall=SS.direction==='calls';
+  grid.innerHTML=strikes.map(s=>{
+    const distFromAtm=Math.abs(s-price)/step;
+    const isAtm=distFromAtm<0.6;
+    const isOtm=isCall?s>price:s<price;
+    const isItm=isCall?s<price:s>price;
+    let cls='strike-btn';
+    if(isAtm)cls+=' atm';
+    const label=`$${s}${isAtm?' ATM':isOtm?' OTM':' ITM'}`;
     return `<div class="${cls}" onclick="selectStrike(${s})">${label}</div>`;
   }).join('');
-  strikeState.selectedStrike = null;
-  document.getElementById('strike-rating').style.display = 'none';
-  document.getElementById('metric-bars').style.display = 'none';
+  SS.selectedStrike=null;
 }
 
-function selectStrike(strike) {
-  strikeState.selectedStrike = strike;
-  document.querySelectorAll('.strike-btn').forEach(b => {
+function selectStrike(strike){
+  SS.selectedStrike=strike;
+  document.querySelectorAll('.strike-btn').forEach(b=>{
     b.classList.remove('selected-call','selected-put');
-    if (parseFloat(b.textContent) === strike || b.textContent.startsWith('$'+strike)) {
-      b.classList.add(strikeState.direction === 'calls' ? 'selected-call' : 'selected-put');
+    // Match by text content start
+    if(b.textContent.startsWith('$'+strike)){
+      b.classList.add(SS.direction==='calls'?'selected-call':'selected-put');
     }
   });
   renderRating(strike);
 }
 
-function renderRating(strike) {
-  const { direction, expiry, ticker, price, scanData } = strikeState;
-  const isCall = direction === 'calls';
-  const isOtm = isCall ? strike > price : strike < price;
-  const otmPct = Math.abs(strike - price) / price * 100;
+function renderRating(strike){
+  const {direction,expiry,ticker,price,scanData}=SS;
+  const isCall=direction==='calls';
+  const otmPct=Math.abs(strike-price)/price*100;
+  const isOtm=isCall?strike>price:strike<price;
 
-  // Scoring weights by expiry
-  const weights = {
-    '0dte':    { flow: 0.35, intraday: 0.30, technicals: 0.20, thesis: 0.15 },
-    'week':    { flow: 0.25, intraday: 0.20, technicals: 0.30, thesis: 0.25 },
-    '2week':   { flow: 0.20, intraday: 0.15, technicals: 0.30, thesis: 0.35 },
-    'monthly': { flow: 0.15, intraday: 0.10, technicals: 0.30, thesis: 0.45 }
-  };
-  const w = weights[expiry];
+  // Expiry weights
+  const W={
+    '0dte':{flow:0.35,intraday:0.30,technicals:0.20,thesis:0.15},
+    'week':{flow:0.25,intraday:0.20,technicals:0.30,thesis:0.25},
+    '2week':{flow:0.20,intraday:0.15,technicals:0.30,thesis:0.35},
+    'monthly':{flow:0.15,intraday:0.10,technicals:0.30,thesis:0.45}
+  }[expiry]||{flow:0.25,intraday:0.25,technicals:0.25,thesis:0.25};
 
-  // Raw scores from scan data
-  const flowScore = scoreFlow(scanData.flow, isCall);
-  const intradayScore = scoreIntraday(scanData.intradayMove, isCall);
-  const techScore = scoreTechnicals(scanData.technicals, isCall);
-  const thesisScore = scoreThesis(scanData.thesis, isCall, scanData.verdict);
+  // Individual scores 0-1
+  const flowScore=scoreFlow(scanData.flow,isCall);
+  const intradayScore=scoreIntraday(scanData.intradayMove,isCall);
+  const techScore=scoreTechnicals(scanData.technicals,isCall);
+  const thesisScore=scoreThesis(scanData.thesis,isCall,scanData.verdict);
 
-  // OTM penalty
-  const otmPenalty = otmPct > 10 ? 0.7 : otmPct > 5 ? 0.85 : 1.0;
+  // OTM penalty: steeper for short DTE
+  const dtePenalty={'0dte':1.5,'week':1.2,'2week':1.0,'monthly':0.8}[expiry]||1.0;
+  const otmPenalty=otmPct>20?0.3:otmPct>15?0.5:otmPct>10?0.65:otmPct>5?0.85:1.0;
+  const finalOtmPenalty=Math.pow(otmPenalty,dtePenalty);
 
-  // Weighted total
-  const raw = (flowScore * w.flow + intradayScore * w.intraday + techScore * w.technicals + thesisScore * w.thesis) * otmPenalty;
-  const overall = Math.min(10, Math.max(1, Math.round(raw * 10) / 10));
+  // Veto check
+  const vetoFlags=scanData.vetoFlags||'';
+  const hasVeto=vetoFlags&&vetoFlags.toLowerCase()!=='none'&&vetoFlags.trim()!=='';
+  const vetoMultiplier=scanData.verdict==='NO-GO'?0.3:hasVeto?0.6:1.0;
 
-  // Determine verdict
-  let bigVerdict, verdictColor;
-  if (overall >= 7.5) { bigVerdict = isCall ? 'STRONG CALL' : 'STRONG PUT'; verdictColor = isCall ? 'var(--accent)' : 'var(--danger)'; }
-  else if (overall >= 5.5) { bigVerdict = isCall ? 'MODERATE CALL' : 'MODERATE PUT'; verdictColor = isCall ? 'var(--accent)' : 'var(--danger)'; }
-  else if (overall >= 4) { bigVerdict = 'WAIT'; verdictColor = 'var(--warn)'; }
-  else { bigVerdict = 'AVOID'; verdictColor = 'var(--text-muted)'; }
+  const raw=(flowScore*W.flow+intradayScore*W.intraday+techScore*W.technicals+thesisScore*W.thesis)*finalOtmPenalty*vetoMultiplier;
+  const overall=Math.min(10,Math.max(1,Math.round(raw*100)/10));
 
-  const expiryLabels = { '0dte': 'Today', 'week': 'This Week', '2week': '2 Weeks', 'monthly': 'Monthly' };
-  const contractLabel = `${ticker} $${strike}${isCall ? 'C' : 'P'} ${expiryLabels[expiry]}`;
+  // Verdict
+  let bigVerdict,verdictColor;
+  if(overall>=8){bigVerdict=isCall?'STRONG CALL':'STRONG PUT';verdictColor=isCall?'var(--accent)':'var(--danger)';}
+  else if(overall>=6.5){bigVerdict=isCall?'CALL':'PUT';verdictColor=isCall?'var(--accent)':'var(--danger)';}
+  else if(overall>=5){bigVerdict='WATCHLIST';verdictColor='var(--warn)';}
+  else if(overall>=3){bigVerdict='WAIT';verdictColor='var(--warn)';}
+  else{bigVerdict='AVOID';verdictColor='var(--text-muted)';}
 
-  // Big rating display
-  const ratingEl = document.getElementById('strike-rating');
-  ratingEl.style.display = 'block';
-  ratingEl.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+  const expLabel={
+    '0dte':SS.expiryDates['0dte']||'Today',
+    'week':SS.expiryDates['week']||'This Week',
+    '2week':SS.expiryDates['2week']||'2 Weeks',
+    'monthly':SS.expiryDates['monthly']||'Monthly'
+  }[expiry];
+
+  const contractLabel=`${ticker} $${strike}${isCall?'C':'P'} · ${expLabel}`;
+
+  // Explain score modifiers
+  const modifiers=[];
+  if(vetoMultiplier<1&&scanData.verdict==='NO-GO') modifiers.push(`⛔ NO-GO verdict — score penalized ${Math.round((1-vetoMultiplier)*100)}%`);
+  else if(vetoMultiplier<1&&hasVeto) modifiers.push(`⚠ Veto flags present — score penalized ${Math.round((1-vetoMultiplier)*100)}%`);
+  if(finalOtmPenalty<0.95) modifiers.push(`⚠ Deep OTM penalty — ${otmPct.toFixed(1)}% from ATM`);
+  if(hasVeto&&vetoFlags) modifiers.push(`Veto flags: ${vetoFlags.slice(0,120)}`);
+
+  const ratingEl=document.getElementById('strike-rating');
+  ratingEl.style.display='block';
+  ratingEl.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;">${contractLabel}</div>
-      ${otmPct > 10 ? '<div style="font-family:var(--mono);font-size:9px;color:var(--warn);">⚠ Deep OTM — premium risk high</div>' : ''}
     </div>
-    <div style="display:flex;align-items:center;gap:16px;">
-      <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:${verdictColor};line-height:1;">${bigVerdict}</div>
+    <div style="display:flex;align-items:center;gap:20px;margin-bottom:${modifiers.length?'12px':'0'};">
+      <div style="font-family:var(--mono);font-size:32px;font-weight:700;color:${verdictColor};line-height:1;">${bigVerdict}</div>
       <div>
-        <div style="font-family:var(--mono);font-size:28px;font-weight:600;color:${verdictColor};line-height:1;">${overall.toFixed(1)}<span style="font-size:14px;color:var(--text-muted)">/10</span></div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;margin-top:2px;">OVERALL RATING</div>
+        <div style="font-family:var(--mono);font-size:28px;font-weight:600;color:${verdictColor};line-height:1;">${overall.toFixed(1)}<span style="font-size:13px;color:var(--text-muted)">/10</span></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;margin-top:3px;">OVERALL</div>
       </div>
-    </div>`;
+    </div>
+    ${modifiers.length?`<div style="font-family:var(--mono);font-size:9px;line-height:1.7;color:var(--warn);">${modifiers.join('<br>')}</div>`:''}`;
 
   // Metric bars
-  const metrics = [
-    { name: 'Flow', score: flowScore, weight: w.flow },
-    { name: 'Intraday', score: intradayScore, weight: w.intraday },
-    { name: 'Technicals', score: techScore, weight: w.technicals },
-    { name: 'Thesis', score: thesisScore, weight: w.thesis },
+  const metrics=[
+    {name:'Flow',score:flowScore,weight:W.flow},
+    {name:'Intraday',score:intradayScore,weight:W.intraday},
+    {name:'Technicals',score:techScore,weight:W.technicals},
+    {name:'Thesis',score:thesisScore,weight:W.thesis}
   ];
-
-  const barsEl = document.getElementById('metric-bars');
-  barsEl.style.display = 'block';
-  document.getElementById('metric-bars-inner').innerHTML = metrics.map(m => {
-    const pct = m.score * 100;
-    const color = pct >= 70 ? 'var(--accent)' : pct >= 45 ? 'var(--warn)' : 'var(--danger)';
+  const barsEl=document.getElementById('metric-bars');
+  barsEl.style.display='block';
+  document.getElementById('metric-bars-inner').innerHTML=metrics.map(m=>{
+    const pct=m.score*100;
+    const color=pct>=70?'var(--accent)':pct>=45?'var(--warn)':'var(--danger)';
+    const numScore=(m.score*10).toFixed(1);
     return `<div class="metric-row">
       <div class="metric-name">${m.name}</div>
       <div class="metric-track"><div class="metric-fill" style="width:${pct}%;background:${color};"></div></div>
-      <div class="metric-score" style="color:${color};">${(m.score*10).toFixed(1)}</div>
+      <div class="metric-score" style="color:${color};">${numScore}</div>
     </div>`;
   }).join('');
 }
 
-// Scoring functions — parse scan text signals into 0-1 scores
-function scoreFlow(flowText, isCall) {
-  if (!flowText) return 0.5;
-  const t = flowText.toLowerCase();
-  if (t.includes('no unusual') || t.includes('no flow') || t.includes('none')) return 0.2;
-  if (t.includes('heavy call') || t.includes('large call') || t.includes('sweep')) return isCall ? 0.9 : 0.2;
-  if (t.includes('heavy put') || t.includes('large put')) return isCall ? 0.2 : 0.9;
-  if (t.includes('unusual') || t.includes('large block') || t.includes('notable')) return 0.75;
-  if (t.includes('mixed') || t.includes('moderate')) return 0.5;
+// Scoring helpers
+function scoreFlow(t,isCall){
+  if(!t)return 0.5;
+  t=t.toLowerCase();
+  if(t.includes('no unusual')||t.includes('no flow')||t.includes('none'))return 0.2;
+  if(t.includes('heavy call')||t.includes('large call')||t.includes('sweep'))return isCall?0.9:0.15;
+  if(t.includes('heavy put')||t.includes('large put'))return isCall?0.15:0.9;
+  if(t.includes('unusual')||t.includes('large block')||t.includes('notable'))return 0.75;
+  if(t.includes('mixed')||t.includes('moderate'))return 0.5;
   return 0.55;
 }
-
-function scoreIntraday(movePct, isCall) {
-  const move = Math.abs(movePct);
-  if (move > 10) return 0.1; // too late
-  if (move > 7) return 0.3;
-  if (move > 5) return 0.5;
-  if (move > 2) return isCall ? (movePct > 0 ? 0.8 : 0.4) : (movePct < 0 ? 0.8 : 0.4);
-  return 0.65; // minimal move = pre-move entry
+function scoreIntraday(move,isCall){
+  const m=Math.abs(move||0);
+  if(m>10)return 0.05;
+  if(m>7)return 0.25;
+  if(m>5)return 0.45;
+  if(m>2)return isCall?(move>0?0.8:0.35):(move<0?0.8:0.35);
+  return 0.7; // minimal move = pre-move entry ideal
+}
+function scoreTechnicals(t,isCall){
+  if(!t)return 0.5;
+  t=t.toLowerCase();
+  let s=0.5;
+  if(t.includes('above 200')&&t.includes('above 50'))s+=isCall?0.2:-0.1;
+  if(t.includes('below 200')||t.includes('below 50'))s+=isCall?-0.15:0.15;
+  if(t.includes('momentum')||t.includes('breakout'))s+=isCall?0.15:-0.05;
+  if(t.includes('oversold')||t.includes('support'))s+=isCall?0.1:0.05;
+  if(t.includes('overbought')||t.includes('resistance'))s+=isCall?-0.1:0.1;
+  return Math.min(1,Math.max(0,s));
+}
+function scoreThesis(t,isCall,verdict){
+  if(verdict==='GO')return isCall?0.85:0.25;
+  if(verdict==='NO-GO')return isCall?0.1:0.85;
+  if(verdict==='WATCHLIST')return 0.55;
+  if(!t)return 0.5;
+  t=t.toLowerCase();
+  let s=0.5;
+  if(t.includes('bullish')||t.includes('upside')||t.includes('catalyst'))s+=isCall?0.2:-0.1;
+  if(t.includes('bearish')||t.includes('downside')||t.includes('risk'))s+=isCall?-0.1:0.2;
+  return Math.min(1,Math.max(0,s));
 }
 
-function scoreTechnicals(techText, isCall) {
-  if (!techText) return 0.5;
-  const t = techText.toLowerCase();
-  let score = 0.5;
-  if (t.includes('above 200') && t.includes('above 50')) score += isCall ? 0.2 : -0.1;
-  if (t.includes('below 200') || t.includes('below 50')) score += isCall ? -0.15 : 0.15;
-  if (t.includes('momentum') || t.includes('breakout')) score += isCall ? 0.15 : -0.1;
-  if (t.includes('oversold') || t.includes('support')) score += isCall ? 0.1 : -0.05;
-  if (t.includes('overbought') || t.includes('resistance')) score += isCall ? -0.1 : 0.1;
-  return Math.min(1, Math.max(0, score));
+// ─── THESIS ANALYSIS ───
+function setThesisWindow(w){
+  thesisWindow=w;
+  document.getElementById('thesis-1w').className=w==='1w'?'expiry-btn active-expiry':'expiry-btn';
+  document.getElementById('thesis-3w').className=w==='3w'?'expiry-btn active-expiry':'expiry-btn';
+  if(lastScanText)runThesisAnalysis();
 }
 
-function scoreThesis(thesisText, isCall, verdict) {
-  if (verdict === 'GO') return isCall ? 0.85 : 0.3;
-  if (verdict === 'NO-GO') return isCall ? 0.15 : 0.8;
-  if (verdict === 'WATCHLIST') return 0.55;
-  if (!thesisText) return 0.5;
-  const t = thesisText.toLowerCase();
-  let score = 0.5;
-  if (t.includes('bullish') || t.includes('upside') || t.includes('catalyst')) score += isCall ? 0.2 : -0.1;
-  if (t.includes('bearish') || t.includes('downside') || t.includes('risk')) score += isCall ? -0.1 : 0.2;
-  return Math.min(1, Math.max(0, score));
+async function runThesisAnalysis(){
+  if(!lastScanTicker||!lastScanText)return;
+  document.getElementById('thesis-panel').style.display='block';
+  document.getElementById('thesis-ticker-label').textContent=lastScanTicker;
+  document.getElementById('thesis-loading').style.display='block';
+  document.getElementById('thesis-content').style.display='none';
+  document.getElementById('thesis-verdict').style.display='none';
+  const winLabel=thesisWindow==='1w'?'1 week (0DTE through weekly options)':'3 weeks (weekly through monthly options)';
+  try{
+    const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      _model:'claude-sonnet-4-6',_useWebSearch:document.getElementById('chk-web')?.checked!==false,
+      model:'claude-sonnet-4-6',max_tokens:1400,
+      system:`You are a FirstSignal trade thesis analyst. Argue both sides then give a consensus.
+Format EXACTLY (no markdown):
+TIMEFRAME: [window]
+CURRENT PRICE: [$price]
+BULL CASE (CALLS):
+[4 specific bullish reasons — catalyst, flow, insider buys, senator buys, technicals]
+BEAR CASE (PUTS):
+[4 specific bearish reasons — risks, resistance, insider sells, senator sells, flags]
+CONSENSUS: [CALLS / PUTS / WAIT]
+CONVICTION SCORE: [1-10 number]
+CONVICTION LEVEL: [HIGH (7-10) / MEDIUM (4-6) / LOW (1-3)]
+OPTIMAL STRIKE: [specific $ strike]
+OPTIMAL EXPIRY: [specific date like Jun 20 2026]
+ENTRY RANGE: [$X-$Y premium]
+HEDGE: [opposite play at 10% of position]
+REASONING: [2 sentences why consensus wins]`,
+      messages:[{role:'user',content:`Scan data for ${lastScanTicker}:\n\n${lastScanText}\n\nBuild trade thesis for ${winLabel} window. Include senator and insider in analysis. Date: ${TODAY}.`}]
+    })});
+    const data=await r.json();
+    const text=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()||'No response.';
+    const consensus=text.match(/^CONSENSUS: (CALLS|PUTS|WAIT)/m)?.[1];
+    const convScore=parseFloat(text.match(/^CONVICTION SCORE: (\d+\.?\d*)/m)?.[1])||null;
+    const convLevel=text.match(/^CONVICTION LEVEL: (HIGH|MEDIUM|LOW)/m)?.[1];
+
+    const colored=text
+      .replace(/^(BULL CASE.*:)/m,'<span style="color:var(--accent);font-weight:600;">$1</span>')
+      .replace(/^(BEAR CASE.*:)/m,'<span style="color:var(--danger);font-weight:600;">$1</span>')
+      .replace(/^(CONSENSUS:|CONVICTION SCORE:|CONVICTION LEVEL:|OPTIMAL STRIKE:|OPTIMAL EXPIRY:|ENTRY RANGE:|HEDGE:|REASONING:|TIMEFRAME:|CURRENT PRICE:)/gm,'<span style="color:var(--text-muted);">$1</span>');
+    document.getElementById('thesis-content').innerHTML=colored;
+    document.getElementById('thesis-content').style.display='block';
+    document.getElementById('thesis-loading').style.display='none';
+
+    if(consensus){
+      const color=consensus==='CALLS'?'var(--accent)':consensus==='PUTS'?'var(--danger)':'var(--warn)';
+      const convColor=convLevel==='HIGH'?color:convLevel==='MEDIUM'?'var(--warn)':'var(--text-muted)';
+      document.getElementById('thesis-verdict').innerHTML=`
+        <div style="display:flex;align-items:center;gap:20px;">
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${color};">${consensus}</div>
+          <div>
+            ${convScore!==null?`<div style="font-family:var(--mono);font-size:22px;font-weight:600;color:${convColor};">${convScore.toFixed(1)}<span style="font-size:11px;color:var(--text-muted)">/10</span></div>`:''}
+            <div style="font-family:var(--mono);font-size:9px;color:${convColor};font-weight:600;">${convLevel||'—'} CONVICTION</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:2px;">${thesisWindow==='1w'?'1-Week':'3-Week'} Window</div>
+          </div>
+        </div>`;
+      document.getElementById('thesis-verdict').style.display='block';
+    }
+  }catch(err){
+    document.getElementById('thesis-content').textContent=`Error: ${err.message}`;
+    document.getElementById('thesis-content').style.display='block';
+    document.getElementById('thesis-loading').style.display='none';
+  }
 }
+
+// ─── STW FEED ───
+async function loadSTWFeed(){
+  const el=document.getElementById('stw-feed');
+  el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Loading...</div>';
+  try{
+    const r=await fetch('/api/discord',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel_id:'1330108200594309120',limit:10})});
+    const data=await r.json();
+    if(data.error||!data.messages?.length){
+      el.innerHTML='<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Add DISCORD_BOT_TOKEN to Vercel env vars to enable.</div>';
+      return;
+    }
+    el.innerHTML=data.messages.slice(0,8).map(m=>{
+      const time=new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'America/New_York'});
+      const c=(m.content||'').slice(0,80).replace(/\b([A-Z]{2,5})\b/g,match=>`<span style="color:var(--accent);cursor:pointer;" onclick="quickScan('${match}')">${match}</span>`);
+      return `<div style="padding:5px 0;border-bottom:1px solid var(--border);"><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${m.author} · ${time}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text);line-height:1.4;">${c}</div></div>`;
+    }).join('');
+  }catch(err){el.innerHTML=`<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${err.message}</div>`;}
+}
+
+// ─── TRADE LOG ───
+async function loadTrades(){
+  const data=await sbGet('trades',`session_date=eq.${TODAY}&order=created_at.desc`);
+  if(Array.isArray(data)){trades=data;renderLog();updateStats();}
+}
+function showAddTrade(){document.getElementById('add-trade-form').style.display='block';}
+function hideAddTrade(){document.getElementById('add-trade-form').style.display='none';}
+async function addTrade(){
+  const ticker=document.getElementById('t-ticker').value.toUpperCase().trim();
+  const strike=document.getElementById('t-strike').value.trim();
+  const entry_price=parseFloat(document.getElementById('t-entry').value)||null;
+  const result=document.getElementById('t-result').value.trim();
+  const status=document.getElementById('t-status').value;
+  const notes=document.getElementById('t-note').value.trim();
+  if(!ticker)return;
+  const result_pct=result?parseFloat(result.replace('%','').replace('+','')):null;
+  await sbInsert('trades',{ticker,strike,entry_price,result_pct,status,notes,phase:currentPhase,session_date:TODAY});
+  ['t-ticker','t-strike','t-entry','t-result','t-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('t-status').value='open';
+  hideAddTrade(); await loadTrades();
+}
+function logTradeFromWorkspace(){showSection('log',null);showAddTrade();}
+function renderLog(filter='all'){
+  const filtered=filter==='all'?trades:trades.filter(t=>t.status===filter);
+  document.getElementById('signal-log-list').innerHTML=filtered.length?filtered.map(t=>`
+    <div class="signal-entry">
+      <div class="signal-top"><span class="signal-ticker">${t.ticker}</span><span class="signal-result ${t.status}">${t.result_pct!=null?(t.result_pct>0?'+':'')+t.result_pct+'%':t.status.toUpperCase()}</span></div>
+      <div class="signal-meta">${t.strike?t.strike+' · ':''}${t.entry_price?'$'+t.entry_price+' · ':''}${new Date(t.created_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>
+      ${t.notes?`<div class="signal-note">${t.notes}</div>`:''}
+    </div>`).join(''):'<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:12px 0;">No entries.</div>';
+  const recent=document.getElementById('recent-signals');
+  recent.innerHTML=trades.slice(0,5).map(t=>`
+    <div class="signal-entry">
+      <div class="signal-top"><span class="signal-ticker">${t.ticker}</span><span class="signal-result ${t.status}">${t.result_pct!=null?(t.result_pct>0?'+':'')+t.result_pct+'%':t.status.toUpperCase()}</span></div>
+      <div class="signal-meta">${new Date(t.created_at).toLocaleDateString()}</div>
+    </div>`).join('')||'<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals yet.</div>';
+}
+function updateStats(){
+  const wins=trades.filter(t=>t.status==='win').length,losses=trades.filter(t=>t.status==='loss').length,closed=wins+losses;
+  document.getElementById('stat-trades').textContent=trades.length;
+  document.getElementById('stat-wins').textContent=wins;
+  document.getElementById('stat-losses').textContent=losses;
+  const wr=closed?Math.round(wins/closed*100)+'%':'—';
+  const el=document.getElementById('stat-winrate');
+  el.textContent=wr;
+  el.className='stat-val'+(closed?(wins/closed>=0.5?' up':' down'):'');
+}
+
+// ─── DENYLIST ───
+async function loadDenylist(){
+  const data=await sbGet('denylist','order=created_at.asc');
+  if(Array.isArray(data)&&data.length){denylistTickers=data.map(d=>d.ticker);renderDenylist(data);}
+  else renderDenylist(denylistTickers.map(t=>({ticker:t,reason:'Signal corruption confirmed'})));
+}
+function renderDenylist(items){
+  document.getElementById('denylist-container').innerHTML=items.map(d=>`<div class="deny-ticker">${d.ticker} <span class="deny-reason">${d.reason||''}</span></div>`).join('');
+}
+function showDenyAdd(){document.getElementById('deny-add-row').style.display='flex';document.getElementById('deny-input').focus();}
+async function confirmDeny(){
+  const ticker=document.getElementById('deny-input').value.toUpperCase().trim();
+  const reason=document.getElementById('deny-reason-input').value.trim()||'Signal corruption';
+  if(!ticker)return;
+  await sbInsert('denylist',{ticker,reason});
+  document.getElementById('deny-input').value='';
+  document.getElementById('deny-reason-input').value='';
+  document.getElementById('deny-add-row').style.display='none';
+  await loadDenylist();
+}
+
+// ─── MACRO TAPE ───
+async function fetchMacroTape(){
+  try{
+    const r=await fetch('/api/tape');
+    if(!r.ok)return;
+    const json=await r.json();
+    ['SPY','QQQ','VIX','TLT','IWM'].forEach(sym=>{
+      if(!json[sym])return;
+      const{price,chg,up}=json[sym];
+      ['','2'].forEach(sfx=>{
+        const pe=document.getElementById(`t-${sym}-p${sfx}`),ce=document.getElementById(`t-${sym}-c${sfx}`);
+        if(pe)pe.textContent=price;
+        if(ce){ce.textContent=chg;ce.className=`tape-chg ${up?'up':'down'}`;}
+      });
+    });
+  }catch(e){}
+}
+
+// ─── ADD RULE ───
+let ruleCount=23;
+function addRule(){
+  const text=prompt('New rule:');
+  if(!text)return;
+  const el=document.createElement('div');
+  el.className='rule-item';
+  el.innerHTML=`<span class="rule-num">R-${String(ruleCount).padStart(2,'0')}</span><span class="rule-text">${text}</span>`;
+  document.getElementById('rules-grid').appendChild(el);
+  ruleCount++;
+}
+
+// ─── INIT ───
+async function init(){
+  await Promise.all([loadTrades(),loadDenylist()]);
+  renderLog(); updateStats();
+  fetchMacroTape();
+  setInterval(fetchMacroTape,60000);
+  loadSTWFeed();
+  setInterval(loadSTWFeed,120000);
+}
+init();
 </script>
+</body>
+</html>
 </body>
 </html>
