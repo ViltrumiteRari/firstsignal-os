@@ -970,7 +970,7 @@ Be direct. No fluff. This is an operational tool.`;
     const userMsg = `Analyze ${ticker} for a FirstSignal trade setup right now. ${isDenied ? 'NOTE: This ticker is on the Signal Corruption Denylist — flag this immediately as NO-GO.' : ''} Pull whatever current data you can on price action, insider activity, options flow, and technicals. Run it against all FirstSignal rules and return your structured assessment.`;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
