@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIRST SIGNAL // COMMAND</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080B0F;
+    --surface: #0E1318;
+    --surface2: #121920;
+    --border: #1C2530;
+    --border2: #243040;
+    --accent: #00E5A0;
+    --accent-dim: rgba(0,229,160,0.08);
+    --accent-mid: rgba(0,229,160,0.15);
+    --warn: #E5A000;
+    --danger: #E54040;
+    --text: #C8D8E4;
+    --text-muted: #4A6070;
+    --text-dim: #2A3E50;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  /* LAYOUT */
+  .os-shell {
+    display: grid;
+    grid-template-rows: 40px 1fr;
+    grid-template-columns: 200px 1fr 280px;
+    height: 100vh;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .signal-mark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,229,160,0.4); }
+    50% { opacity: 0.4; box-shadow: 0 0 0 4px rgba(0,229,160,0); }
+  }
+
+  .os-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .os-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .clock {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+  }
+
+  .status-pill {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    padding: 2px 8px;
+    border-radius: 2px;
+    text-transform: uppercase;
+  }
+
+  .status-live { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
+  .status-closed { background: rgba(229,64,64,0.08); color: var(--danger); border: 1px solid rgba(229,64,64,0.2); }
+
+  /* LEFT NAV */
+  .nav {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nav-section-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    padding: 12px 16px 6px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-left: 2px solid transparent;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .nav-item:hover { background: var(--accent-dim); color: var(--text); }
+  .nav-item.active {
+    background: var(--accent-dim);
+    border-left-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .nav-icon {
+    font-size: 11px;
+    width: 14px;
+    text-align: center;
+    opacity: 0.7;
+  }
+
+  .nav-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 16px;
+  }
+
+  .nav-bottom {
+    margin-top: auto;
+    padding: 0;
+  }
+
+  /* MAIN CONTENT */
+  .main {
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::before {
+    content: '';
+    display: block;
+    width: 2px;
+    height: 12px;
+    background: var(--accent);
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+  }
+
+  .card-sm {
+    padding: 12px;
+  }
+
+  /* RULES LIST */
+  .rules-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, auto);
+    gap: 8px;
+  }
+
+  .rule-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 12px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    transition: border-color 0.15s;
+  }
+
+  .rule-item:hover { border-color: var(--border2); }
+
+  .rule-num {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    min-width: 28px;
+    padding-top: 1px;
+  }
+
+  .rule-text {
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .rule-tag {
+    font-family: var(--mono);
+    font-size: 8px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .tag-entry { background: rgba(0,229,160,0.1); color: var(--accent); }
+  .tag-exit { background: rgba(229,160,0,0.1); color: var(--warn); }
+  .tag-risk { background: rgba(229,64,64,0.1); color: var(--danger); }
+  .tag-size { background: rgba(100,140,180,0.1); color: #6496C8; }
+
+  /* SCANNER */
+  .scanner-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .scanner-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+
+  .step-check {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.15s;
+  }
+
+  .step-check:hover { border-color: var(--accent); }
+  .step-check.checked { background: var(--accent); border-color: var(--accent); }
+  .step-check.checked::after { content: '✓'; font-size: 9px; color: var(--bg); font-weight: 700; }
+
+  .step-content { flex: 1; }
+  .step-title { font-size: 12px; color: var(--text); font-weight: 500; }
+  .step-detail { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* DENYLIST */
+  .denylist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .deny-ticker {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    background: rgba(229,64,64,0.08);
+    border: 1px solid rgba(229,64,64,0.2);
+    color: var(--danger);
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .deny-reason {
+    color: var(--text-muted);
+    font-size: 9px;
+    border-left: 1px solid rgba(229,64,64,0.2);
+    padding-left: 6px;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-block {
+    border-bottom: 1px solid var(--border);
+    padding: 14px;
+  }
+
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+  }
+
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-val.up { color: var(--accent); }
+  .stat-val.down { color: var(--danger); }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  /* SIGNAL LOG */
+  .signal-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .signal-entry:last-child { border-bottom: none; }
+
+  .signal-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .signal-ticker {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+
+  .signal-result {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .signal-result.win { color: var(--accent); }
+  .signal-result.loss { color: var(--danger); }
+  .signal-result.open { color: var(--warn); }
+
+  .signal-meta {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .signal-note {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  /* PLAYBOOK SUMMARY */
+  .playbook-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .playbook-row:last-child { border-bottom: none; }
+
+  .playbook-key {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .playbook-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text);
+    text-align: right;
+    max-width: 140px;
+  }
+
+  .playbook-val.accent { color: var(--accent); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* SECTION TABS */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .tab {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ADD ENTRY */
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .os-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 7px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .os-input:focus { border-color: var(--border2); }
+  .os-input::placeholder { color: var(--text-dim); }
+
+  .os-btn {
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.2);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 7px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .os-btn:hover { background: var(--accent-mid); }
+
+  .os-btn-sm {
+    padding: 4px 10px;
+    font-size: 9px;
+  }
+</style>
+</head>
+<body>
+<div class="os-shell">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="signal-mark">
+        <div class="pulse-dot"></div>
+        <span class="os-title">First Signal</span>
+      </div>
+      <span class="os-sub">// COMMAND</span>
+    </div>
+    <div class="topbar-right">
+      <span class="clock" id="clock">--:--:-- EST</span>
+      <span class="status-pill" id="market-status">CLOSED</span>
+    </div>
+  </header>
+
+  <!-- LEFT NAV -->
+  <nav class="nav">
+    <div class="nav-section-label">Core</div>
+    <a class="nav-item active" onclick="showSection('rules')">
+      <span class="nav-icon">⚡</span> Rules
+    </a>
+    <a class="nav-item" onclick="showSection('scanner')">
+      <span class="nav-icon">◎</span> Scanner
+    </a>
+    <a class="nav-item" onclick="showSection('log')">
+      <span class="nav-icon">▤</span> Signal Log
+    </a>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Defense</div>
+    <a class="nav-item" onclick="showSection('denylist')">
+      <span class="nav-icon">✕</span> Denylist
+    </a>
+    <a class="nav-item" onclick="showSection('playbook')">
+      <span class="nav-icon">≡</span> Playbook
+    </a>
+
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Links</div>
+    <a class="nav-item" href="https://drive.google.com" target="_blank">
+      <span class="nav-icon">↗</span> FirstSignal Doc
+    </a>
+    <a class="nav-item" href="https://finviz.com/screener?v=111&f=cap_smallover%2Csh_avgvol_o300%2Cta_sma200_pa%2Cta_sma50_pa&ft=4" target="_blank">
+      <span class="nav-icon">↗</span> Finviz Scanner
+    </a>
+    <a class="nav-item" href="https://unusualwhales.com" target="_blank">
+      <span class="nav-icon">↗</span> Unusual Whales
+    </a>
+
+    <div class="nav-bottom">
+      <div class="nav-divider"></div>
+      <div class="nav-section-label">v1.0 // PRIVATE</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- RULES SECTION -->
+    <div id="section-rules" class="tab-content active">
+      <div class="section-header">
+        <div class="section-title">Execution Rules</div>
+        <span class="os-btn os-btn-sm" onclick="addRule()">+ Rule</span>
+      </div>
+      <div class="rules-grid" id="rules-grid">
+        <div class="rule-item">
+          <span class="rule-num">R-01</span>
+          <span class="rule-text">Unusual flow signal required before entry<span class="rule-tag tag-entry">ENTRY</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-02</span>
+          <span class="rule-text">Pre-move entries only — under ~10% intraday move<span class="rule-tag tag-entry">ENTRY</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-03</span>
+          <span class="rule-text">0DTE/short-DTE OTM calls, $0.02–0.08 entry<span class="rule-tag tag-size">SIZE</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-04</span>
+          <span class="rule-text">Swing entries: $0.40–0.65 premium range<span class="rule-tag tag-size">SIZE</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-05</span>
+          <span class="rule-text">One reload rule — no averaging down beyond one add<span class="rule-tag tag-risk">RISK</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-06</span>
+          <span class="rule-text">Kelly sizing — size to conviction, not emotion<span class="rule-tag tag-size">SIZE</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-07</span>
+          <span class="rule-text">No earnings plays — catalyst timing risk too high<span class="rule-tag tag-risk">RISK</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-08</span>
+          <span class="rule-text">SMID caps only — unless unusual conviction on mega cap<span class="rule-tag tag-entry">ENTRY</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-09</span>
+          <span class="rule-text">Always hedge — no naked directional exposure without offset<span class="rule-tag tag-risk">RISK</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-10</span>
+          <span class="rule-text">Sell on premium expansion — strike price does NOT need to be reached<span class="rule-tag tag-exit">EXIT</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-11</span>
+          <span class="rule-text">Thesis drives entry, technicals time it — weak tech ≠ dead trade, wait<span class="rule-tag tag-entry">ENTRY</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-21</span>
+          <span class="rule-text">Mega cap strike: near-ATM only, delta minimum 0.20<span class="rule-tag tag-entry">ENTRY</span></span>
+        </div>
+        <div class="rule-item">
+          <span class="rule-num">R-22</span>
+          <span class="rule-text">Prior day run filter — check if move already happened yesterday<span class="rule-tag tag-entry">ENTRY</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCANNER SECTION -->
+    <div id="section-scanner" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Signal Scanner</div>
+      </div>
+
+      <!-- MANUAL TICKER LOOKUP -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Ticker Deep Scan</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="os-input" id="scan-ticker" placeholder="Enter ticker (e.g. NVDA)" style="text-transform:uppercase;">
+          <span class="os-btn" onclick="runTickerScan()" id="scan-btn">▶ Scan</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);">
+          Runs ticker against all FirstSignal rules — checks intraday move, prior day run, denylist, insider activity via FMP, flow signals. Returns GO / NO-GO verdict.
+        </div>
+      </div>
+
+      <!-- SCAN RESULTS -->
+      <div id="scan-results" style="display:none;">
+        <div class="card">
+          <div id="scan-output" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;"></div>
+        </div>
+      </div>
+
+      <!-- SCAN LOADING -->
+      <div id="scan-loading" style="display:none;padding:20px 0;text-align:center;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;" id="scan-loading-text">SCANNING...</div>
+        <div style="margin-top:8px;display:flex;gap:4px;justify-content:center;" id="scan-dots">
+          <div style="width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite;"></div>
+          <div style="width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out 0.4s infinite;"></div>
+          <div style="width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out 0.8s infinite;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">Finviz Screen</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-bottom:10px;">Small cap+, avg vol 300k+, above 50MA + 200MA. Open to pull today's list manually then paste tickers above to scan each.</div>
+        <a href="https://finviz.com/screener?v=111&f=cap_smallover%2Csh_avgvol_o300%2Cta_sma200_pa%2Cta_sma50_pa&ft=4" target="_blank" class="os-btn os-btn-sm" style="display:inline-block;text-decoration:none;">↗ Open Finviz Screen</a>
+      </div>
+    </div>
+
+    <!-- SIGNAL LOG SECTION -->
+    <div id="section-log" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Signal Log</div>
+        <span class="os-btn os-btn-sm" onclick="showAddTrade()">+ Entry</span>
+      </div>
+      <div id="add-trade-form" style="display:none; margin-bottom:12px;">
+        <div class="card card-sm">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
+            <input class="os-input" id="t-ticker" placeholder="Ticker">
+            <input class="os-input" id="t-strike" placeholder="Strike / Expiry">
+            <input class="os-input" id="t-entry" placeholder="Entry $">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+            <input class="os-input" id="t-result" placeholder="Result (e.g. +215% or -100%)">
+            <select class="os-input" id="t-status">
+              <option value="open">Open</option>
+              <option value="win">Win</option>
+              <option value="loss">Loss</option>
+            </select>
+          </div>
+          <input class="os-input" id="t-note" placeholder="Thesis / Notes" style="width:100%; margin-bottom:8px;">
+          <div style="display:flex; gap:8px;">
+            <span class="os-btn os-btn-sm" onclick="addTrade()">Log Trade</span>
+            <span class="os-btn os-btn-sm" style="background:transparent;border-color:var(--border2);color:var(--text-muted);" onclick="hideAddTrade()">Cancel</span>
+          </div>
+        </div>
+      </div>
+      <div id="signal-log-list"></div>
+    </div>
+
+    <!-- DENYLIST SECTION -->
+    <div id="section-denylist" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Signal Corruption Denylist</div>
+        <span class="os-btn os-btn-sm" onclick="addDeny()">+ Ticker</span>
+      </div>
+      <div class="card">
+        <div class="denylist" id="denylist-container">
+          <div class="deny-ticker">TMHC <span class="deny-reason">Confirmed burn</span></div>
+          <div class="deny-ticker">RAMP <span class="deny-reason">Confirmed burn</span></div>
+          <div class="deny-ticker">GRRR <span class="deny-reason">Confirmed burn</span></div>
+        </div>
+        <div class="add-row" id="deny-add-row" style="display:none;">
+          <input class="os-input" id="deny-input" placeholder="Ticker">
+          <input class="os-input" id="deny-reason-input" placeholder="Reason">
+          <span class="os-btn os-btn-sm" onclick="confirmDeny()">Add</span>
+        </div>
+      </div>
+      <div style="margin-top:12px; font-family:var(--mono); font-size:10px; color:var(--text-muted);">
+        These tickers have demonstrated signal corruption — unusual flow did not translate to price movement. Hard pass regardless of setup quality.
+      </div>
+    </div>
+
+    <!-- PLAYBOOK SECTION -->
+    <div id="section-playbook" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Trading Playbook</div>
+      </div>
+      <div class="card">
+        <div class="playbook-row">
+          <span class="playbook-key">Strategy</span>
+          <span class="playbook-val accent">0DTE / Short-DTE OTM Calls</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Entry Range (0DTE)</span>
+          <span class="playbook-val">$0.02 – $0.08 premium</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Entry Range (Swing)</span>
+          <span class="playbook-val">$0.40 – $0.65 premium</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Signal Required</span>
+          <span class="playbook-val">Unusual options flow — InfoLib / UW</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Exit Trigger</span>
+          <span class="playbook-val">Premium expansion — NOT ITM</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Sizing</span>
+          <span class="playbook-val">Kelly criterion</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Reload Rule</span>
+          <span class="playbook-val">Max 1 reload per position</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Earnings</span>
+          <span class="playbook-val" style="color:var(--danger)">Never — hard rule</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Universe</span>
+          <span class="playbook-val">SMID cap primary / mega cap near-ATM only</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Mega Cap Delta Min</span>
+          <span class="playbook-val">0.20 (Rule 21)</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Primary Scanner</span>
+          <span class="playbook-val">Finviz unusual vol, above 50MA + 200MA</span>
+        </div>
+        <div class="playbook-row">
+          <span class="playbook-key">Flow Source</span>
+          <span class="playbook-val">InfoLib (browser only) + Unusual Whales</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel">
+    <div class="panel-block">
+      <div class="panel-label">Session Stats</div>
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-val" id="stat-trades">0</div>
+          <div class="stat-label">Trades</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="stat-winrate">—</div>
+          <div class="stat-label">Win Rate</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="stat-wins">0</div>
+          <div class="stat-label">Wins</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="stat-losses">0</div>
+          <div class="stat-label">Losses</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Quick Filters</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px;">
+        <span class="status-pill status-live" style="cursor:pointer;" onclick="filterLog('all')">ALL</span>
+        <span class="status-pill" style="background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,229,160,0.2);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:2px;" onclick="filterLog('win')">WINS</span>
+        <span class="status-pill status-closed" style="cursor:pointer;" onclick="filterLog('loss')">LOSSES</span>
+        <span class="status-pill" style="background:rgba(229,160,0,0.08);color:var(--warn);border:1px solid rgba(229,160,0,0.2);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:2px;" onclick="filterLog('open')">OPEN</span>
+      </div>
+    </div>
+
+    <div class="panel-block" style="flex:1; overflow-y:auto;">
+      <div class="panel-label">Recent Signals</div>
+      <div id="recent-signals">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals logged yet.</div>
+      </div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Key Links</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <a href="https://finviz.com/screener?v=111&f=cap_smallover%2Csh_avgvol_o300%2Cta_sma200_pa%2Cta_sma50_pa&ft=4" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Finviz Scanner <span style="color:var(--accent)">↗</span></a>
+        <a href="https://unusualwhales.com" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Unusual Whales <span style="color:var(--accent)">↗</span></a>
+        <a href="https://capitoltrades.com" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Capitol Trades <span style="color:var(--accent)">↗</span></a>
+        <a href="https://bigdata.com" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;display:flex;justify-content:space-between;">Bigdata.com <span style="color:var(--accent)">↗</span></a>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+  // CLOCK + MARKET STATUS
+  function updateClock() {
+    const now = new Date();
+    const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const h = String(est.getHours()).padStart(2,'0');
+    const m = String(est.getMinutes()).padStart(2,'0');
+    const s = String(est.getSeconds()).padStart(2,'0');
+    document.getElementById('clock').textContent = `${h}:${m}:${s} EST`;
+
+    const totalMins = est.getHours() * 60 + est.getMinutes();
+    const isWeekday = est.getDay() > 0 && est.getDay() < 6;
+    const isOpen = isWeekday && totalMins >= 570 && totalMins < 960;
+    const statusEl = document.getElementById('market-status');
+    statusEl.textContent = isOpen ? 'MARKET OPEN' : 'CLOSED';
+    statusEl.className = 'status-pill ' + (isOpen ? 'status-live' : 'status-closed');
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // NAV
+  function showSection(id) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('section-' + id).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  // AI TICKER SCAN
+  const DENYLIST_TICKERS = ['TMHC','RAMP','GRRR'];
+
+  async function runTickerScan() {
+    const ticker = document.getElementById('scan-ticker').value.toUpperCase().trim();
+    if (!ticker) return;
+
+    document.getElementById('scan-results').style.display = 'none';
+    document.getElementById('scan-loading').style.display = 'block';
+    document.getElementById('scan-btn').textContent = '...';
+    document.getElementById('scan-btn').style.pointerEvents = 'none';
+
+    const loadingPhrases = ['CHECKING DENYLIST...','PULLING INSIDER ACTIVITY...','ANALYZING FLOW SIGNALS...','STRESS TESTING RULES...','BUILDING VERDICT...'];
+    let pi = 0;
+    const phraseInterval = setInterval(() => {
+      document.getElementById('scan-loading-text').textContent = loadingPhrases[pi % loadingPhrases.length];
+      pi++;
+    }, 1200);
+
+    const isDenied = DENYLIST_TICKERS.includes(ticker);
+
+    const systemPrompt = `You are the FirstSignal trading OS scanner. You analyze tickers against the FirstSignal rules and return a structured trade assessment.
+
+FirstSignal Rules Summary:
+- Unusual flow signal required before entry (InfoLib / Unusual Whales)
+- Pre-move entries only — under ~10% intraday move, ideally under 5%
+- 0DTE/short-DTE OTM calls: $0.02–0.08 entry. Swings: $0.40–0.65
+- One reload rule. Kelly sizing. No earnings plays.
+- SMID caps primary. Mega cap: near-ATM only, delta min 0.20 (Rule 21)
+- Check prior day run — if big move yesterday, filter disqualified (Rule 22)
+- Exit on premium expansion, NOT when strike is reached
+- Always hedge
+- Signal Corruption Denylist: TMHC, RAMP, GRRR — hard pass
+
+Return your analysis in this exact format:
+TICKER: [ticker]
+STATUS: [GO / NO-GO / WATCHLIST]
+INTRADAY MOVE: [current % move today if available]
+PRIOR DAY: [any significant prior day run?]
+DENYLIST: [YES / NO]
+INSIDER ACTIVITY: [any recent Form 4 / insider buys or sells]
+FLOW SIGNALS: [any notable unusual options activity]
+TECHNICALS: [above/below 50MA and 200MA, any notable setup]
+THESIS: [1-2 sentence reason why this is or isn't a valid setup]
+SUGGESTED STRIKE RANGE: [if GO, suggest strike range and expiry type]
+VERDICT: [1 sentence final call]
+
+Be direct. No fluff. This is an operational tool.`;
+
+    const userMsg = `Analyze ${ticker} for a FirstSignal trade setup right now. ${isDenied ? 'NOTE: This ticker is on the Signal Corruption Denylist — flag this immediately as NO-GO.' : ''} Pull whatever current data you can on price action, insider activity, options flow, and technicals. Run it against all FirstSignal rules and return your structured assessment.`;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMsg }]
+        })
+      });
+
+      const data = await response.json();
+      clearInterval(phraseInterval);
+
+      const text = data.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('\n')
+        .trim();
+
+      // Colorize output
+      const colorized = text
+        .replace(/^(STATUS: )(GO)$/m, '$1<span style="color:var(--accent);font-weight:600;">$2</span>')
+        .replace(/^(STATUS: )(NO-GO)$/m, '$1<span style="color:var(--danger);font-weight:600;">$2</span>')
+        .replace(/^(STATUS: )(WATCHLIST)$/m, '$1<span style="color:var(--warn);font-weight:600;">$2</span>')
+        .replace(/^(TICKER:|INTRADAY MOVE:|PRIOR DAY:|DENYLIST:|INSIDER ACTIVITY:|FLOW SIGNALS:|TECHNICALS:|THESIS:|SUGGESTED STRIKE RANGE:|VERDICT:)/gm,
+          '<span style="color:var(--text-muted);">$1</span>');
+
+      document.getElementById('scan-output').innerHTML = colorized;
+      document.getElementById('scan-loading').style.display = 'none';
+      document.getElementById('scan-results').style.display = 'block';
+
+    } catch(err) {
+      clearInterval(phraseInterval);
+      document.getElementById('scan-output').textContent = 'Scan failed — check connection.\n' + err.message;
+      document.getElementById('scan-loading').style.display = 'none';
+      document.getElementById('scan-results').style.display = 'block';
+    }
+
+    document.getElementById('scan-btn').textContent = '▶ Scan';
+    document.getElementById('scan-btn').style.pointerEvents = 'auto';
+  }
+
+  document.getElementById('scan-ticker').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runTickerScan();
+  });
+
+  // TRADE LOG
+  let trades = [];
+
+  function showAddTrade() {
+    document.getElementById('add-trade-form').style.display = 'block';
+  }
+
+  function hideAddTrade() {
+    document.getElementById('add-trade-form').style.display = 'none';
+  }
+
+  function addTrade() {
+    const ticker = document.getElementById('t-ticker').value.toUpperCase().trim();
+    const strike = document.getElementById('t-strike').value.trim();
+    const entry = document.getElementById('t-entry').value.trim();
+    const result = document.getElementById('t-result').value.trim();
+    const status = document.getElementById('t-status').value;
+    const note = document.getElementById('t-note').value.trim();
+    if (!ticker) return;
+
+    const now = new Date();
+    trades.unshift({ ticker, strike, entry, result, status, note, date: now.toLocaleDateString('en-US', { month:'short', day:'numeric' }) });
+
+    ['t-ticker','t-strike','t-entry','t-result','t-note'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('t-status').value = 'open';
+    hideAddTrade();
+    renderLog();
+    updateStats();
+  }
+
+  function renderLog(filter = 'all') {
+    const list = document.getElementById('signal-log-list');
+    const recent = document.getElementById('recent-signals');
+    const filtered = filter === 'all' ? trades : trades.filter(t => t.status === filter);
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:12px 0;">No entries.</div>';
+    } else {
+      list.innerHTML = filtered.map(t => `
+        <div class="signal-entry">
+          <div class="signal-top">
+            <span class="signal-ticker">${t.ticker}</span>
+            <span class="signal-result ${t.status}">${t.result || (t.status === 'open' ? 'OPEN' : '—')}</span>
+          </div>
+          <div class="signal-meta">${t.strike ? t.strike + ' · ' : ''}${t.entry ? 'Entry: $' + t.entry + ' · ' : ''}${t.date}</div>
+          ${t.note ? `<div class="signal-note">${t.note}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    recent.innerHTML = trades.slice(0,5).map(t => `
+      <div class="signal-entry">
+        <div class="signal-top">
+          <span class="signal-ticker">${t.ticker}</span>
+          <span class="signal-result ${t.status}">${t.result || (t.status === 'open' ? 'OPEN' : '—')}</span>
+        </div>
+        <div class="signal-meta">${t.date}</div>
+      </div>
+    `).join('') || '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals logged yet.</div>';
+  }
+
+  function filterLog(f) { renderLog(f); }
+
+  function updateStats() {
+    const wins = trades.filter(t => t.status === 'win').length;
+    const losses = trades.filter(t => t.status === 'loss').length;
+    const closed = wins + losses;
+    document.getElementById('stat-trades').textContent = trades.length;
+    document.getElementById('stat-wins').textContent = wins;
+    document.getElementById('stat-losses').textContent = losses;
+    document.getElementById('stat-winrate').textContent = closed ? Math.round(wins/closed*100)+'%' : '—';
+    document.getElementById('stat-winrate').className = 'stat-val' + (closed ? (wins/closed >= 0.5 ? ' up' : ' down') : '');
+  }
+
+  renderLog();
+
+  // DENYLIST
+  function addDeny() {
+    document.getElementById('deny-add-row').style.display = 'flex';
+    document.getElementById('deny-input').focus();
+  }
+
+  function confirmDeny() {
+    const ticker = document.getElementById('deny-input').value.toUpperCase().trim();
+    const reason = document.getElementById('deny-reason-input').value.trim() || 'Signal corruption';
+    if (!ticker) return;
+    const container = document.getElementById('denylist-container');
+    const el = document.createElement('div');
+    el.className = 'deny-ticker';
+    el.innerHTML = `${ticker} <span class="deny-reason">${reason}</span>`;
+    container.appendChild(el);
+    document.getElementById('deny-input').value = '';
+    document.getElementById('deny-reason-input').value = '';
+    document.getElementById('deny-add-row').style.display = 'none';
+  }
+
+  // RULE ADD
+  let ruleCount = 23;
+  function addRule() {
+    const text = prompt('Rule text:');
+    if (!text) return;
+    const grid = document.getElementById('rules-grid');
+    const el = document.createElement('div');
+    el.className = 'rule-item';
+    el.innerHTML = `<span class="rule-num">R-${String(ruleCount).padStart(2,'0')}</span><span class="rule-text">${text}</span>`;
+    grid.appendChild(el);
+    ruleCount++;
+  }
+</script>
+</body>
+</html>
