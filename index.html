@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
     --bg: #080B0F;
     --surface: #0E1318;
@@ -25,27 +24,73 @@
     --text-dim: #2A3E50;
     --mono: 'IBM Plex Mono', monospace;
     --sans: 'Inter', sans-serif;
+    --tape-h: 32px;
+    --topbar-h: 40px;
+    --nav-w: 200px;
+    --panel-w: 280px;
   }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; line-height: 1.5; overflow: hidden; }
 
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 13px;
-    line-height: 1.5;
+  /* TICKER TAPE */
+  .ticker-tape {
+    height: var(--tape-h);
+    background: #060A0D;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
     overflow: hidden;
+    position: relative;
   }
+  .tape-track {
+    display: flex;
+    gap: 0;
+    animation: scroll-tape 60s linear infinite;
+    white-space: nowrap;
+  }
+  .tape-track:hover { animation-play-state: paused; }
+  @keyframes scroll-tape {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .tape-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    border-right: 1px solid var(--border);
+    height: var(--tape-h);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .tape-sym { color: var(--text); font-weight: 600; letter-spacing: 0.05em; }
+  .tape-price { color: var(--text-muted); }
+  .tape-chg.up { color: var(--accent); }
+  .tape-chg.down { color: var(--danger); }
+  .tape-chg.flat { color: var(--text-muted); }
+  .tape-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    border-right: 1px solid rgba(229,160,0,0.2);
+    height: var(--tape-h);
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--warn);
+    letter-spacing: 0.05em;
+    background: rgba(229,160,0,0.04);
+  }
+  .tape-alert-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--warn); animation: pulse 1s ease-in-out infinite; }
 
-  /* LAYOUT */
+  /* OS SHELL */
   .os-shell {
     display: grid;
-    grid-template-rows: 40px 1fr;
-    grid-template-columns: 200px 1fr 280px;
-    height: 100vh;
+    grid-template-rows: var(--topbar-h) 1fr;
+    grid-template-columns: var(--nav-w) 1fr var(--panel-w);
+    height: calc(100vh - var(--tape-h));
   }
 
-  /* TOP BAR */
+  /* TOPBAR */
   .topbar {
     grid-column: 1 / -1;
     background: var(--surface);
@@ -54,514 +99,202 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 16px;
-    position: relative;
     z-index: 10;
   }
-
-  .topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .signal-mark {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .pulse-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 2.4s ease-in-out infinite;
-  }
-
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .signal-mark { display: flex; align-items: center; gap: 8px; }
+  .pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse {
     0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,229,160,0.4); }
     50% { opacity: 0.4; box-shadow: 0 0 0 4px rgba(0,229,160,0); }
   }
-
-  .os-title {
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    color: var(--accent);
-    text-transform: uppercase;
-  }
-
-  .os-sub {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text-muted);
-    letter-spacing: 0.1em;
-  }
-
-  .topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
-
-  .clock {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    letter-spacing: 0.08em;
-  }
-
-  .status-pill {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    padding: 2px 8px;
-    border-radius: 2px;
-    text-transform: uppercase;
-  }
-
+  .os-title { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.2em; color: var(--accent); text-transform: uppercase; }
+  .os-sub { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.1em; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .clock { font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.08em; }
+  .status-pill { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; padding: 2px 8px; border-radius: 2px; text-transform: uppercase; }
   .status-live { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
   .status-closed { background: rgba(229,64,64,0.08); color: var(--danger); border: 1px solid rgba(229,64,64,0.2); }
+  .status-premarket { background: rgba(229,160,0,0.08); color: var(--warn); border: 1px solid rgba(229,160,0,0.2); }
+  .phase-badge { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; padding: 2px 10px; border-radius: 2px; text-transform: uppercase; border: 1px solid var(--border2); color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+  .phase-badge:hover { border-color: var(--accent); color: var(--accent); }
+  .phase-badge.active-phase { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
-  /* LEFT NAV */
-  .nav {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 16px 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .nav-section-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    padding: 12px 16px 6px;
-  }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background 0.15s;
-    border-left: 2px solid transparent;
-    font-size: 12px;
-    color: var(--text-muted);
-    text-decoration: none;
-  }
-
+  /* NAV */
+  .nav { background: var(--surface); border-right: 1px solid var(--border); padding: 12px 0; overflow-y: auto; display: flex; flex-direction: column; }
+  .nav-section-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; padding: 10px 16px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 16px; cursor: pointer; transition: background 0.15s; border-left: 2px solid transparent; font-size: 12px; color: var(--text-muted); text-decoration: none; }
   .nav-item:hover { background: var(--accent-dim); color: var(--text); }
-  .nav-item.active {
-    background: var(--accent-dim);
-    border-left-color: var(--accent);
-    color: var(--accent);
-  }
+  .nav-item.active { background: var(--accent-dim); border-left-color: var(--accent); color: var(--accent); }
+  .nav-icon { font-size: 11px; width: 14px; text-align: center; opacity: 0.7; }
+  .nav-divider { height: 1px; background: var(--border); margin: 6px 16px; }
+  .nav-bottom { margin-top: auto; }
 
-  .nav-icon {
-    font-size: 11px;
-    width: 14px;
-    text-align: center;
-    opacity: 0.7;
-  }
-
-  .nav-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 8px 16px;
-  }
-
-  .nav-bottom {
-    margin-top: auto;
-    padding: 0;
-  }
-
-  /* MAIN CONTENT */
-  .main {
-    overflow-y: auto;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
+  /* MAIN */
+  .main { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
 
   /* SECTION HEADER */
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .section-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .section-title::before {
-    content: '';
-    display: block;
-    width: 2px;
-    height: 12px;
-    background: var(--accent);
-  }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .section-title::before { content: ''; display: block; width: 2px; height: 12px; background: var(--accent); }
 
   /* CARDS */
-  .card {
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px; }
+  .card-sm { padding: 12px; }
+
+  /* SESSION LANDING */
+  .session-landing { display: flex; flex-direction: column; gap: 16px; }
+  .session-date-bar { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.1em; margin-bottom: 4px; }
+  .phase-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .phase-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 16px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
   }
+  .phase-card:hover { border-color: var(--border2); background: var(--surface2); }
+  .phase-card.phase-active { border-color: var(--accent); background: var(--accent-dim); }
+  .phase-card.phase-complete { border-color: var(--border2); opacity: 0.6; }
+  .phase-card.phase-skipped { opacity: 0.35; cursor: default; }
+  .phase-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .phase-name { font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); }
+  .phase-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border2); }
+  .phase-status-dot.active { background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  .phase-status-dot.complete { background: var(--accent); animation: none; }
+  .phase-status-dot.warn { background: var(--warn); }
+  .phase-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; letter-spacing: -0.01em; }
+  .phase-desc { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+  .phase-time { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-top: 10px; }
+  .phase-tag { font-family: var(--mono); font-size: 8px; padding: 2px 6px; border-radius: 2px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .tag-now { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,0.2); }
+  .tag-done { background: rgba(100,140,180,0.1); color: #6496C8; border: 1px solid rgba(100,140,180,0.2); }
+  .tag-skip { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
 
-  .card-sm {
-    padding: 12px;
-  }
+  /* SESSION WORKSPACE */
+  .session-workspace { display: none; }
+  .session-workspace.active { display: block; }
+  .workspace-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .back-btn { font-family: var(--mono); font-size: 9px; color: var(--text-muted); cursor: pointer; letter-spacing: 0.1em; padding: 4px 8px; border: 1px solid var(--border); border-radius: 2px; }
+  .back-btn:hover { color: var(--text); border-color: var(--border2); }
 
-  /* RULES LIST */
-  .rules-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-auto-flow: column;
-    grid-template-rows: repeat(7, auto);
-    gap: 8px;
-  }
+  /* CHAT INTERFACE */
+  .chat-container { display: flex; flex-direction: column; height: calc(100vh - var(--tape-h) - var(--topbar-h) - 120px); }
+  .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; }
+  .chat-msg { display: flex; flex-direction: column; gap: 4px; }
+  .chat-msg.user { align-items: flex-end; }
+  .chat-msg.assistant { align-items: flex-start; }
+  .chat-bubble { max-width: 85%; padding: 10px 14px; border-radius: 4px; font-size: 12px; line-height: 1.6; }
+  .chat-msg.user .chat-bubble { background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.15); color: var(--text); border-radius: 4px 4px 0 4px; }
+  .chat-msg.assistant .chat-bubble { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 4px 4px 4px 0; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; }
+  .chat-meta { font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+  .chat-input-row { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
 
-  .rule-item {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 10px 12px;
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    transition: border-color 0.15s;
-  }
-
+  /* RULES */
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(7, auto); gap: 8px; }
+  .rule-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; transition: border-color 0.15s; }
   .rule-item:hover { border-color: var(--border2); }
-
-  .rule-num {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--accent);
-    letter-spacing: 0.1em;
-    min-width: 28px;
-    padding-top: 1px;
-  }
-
-  .rule-text {
-    font-size: 11px;
-    color: var(--text);
-    line-height: 1.4;
-  }
-
-  .rule-tag {
-    font-family: var(--mono);
-    font-size: 8px;
-    padding: 1px 5px;
-    border-radius: 2px;
-    margin-left: 6px;
-    vertical-align: middle;
-  }
-
+  .rule-num { font-family: var(--mono); font-size: 9px; color: var(--accent); letter-spacing: 0.1em; min-width: 28px; padding-top: 1px; }
+  .rule-text { font-size: 11px; color: var(--text); line-height: 1.4; }
+  .rule-tag { font-family: var(--mono); font-size: 8px; padding: 1px 5px; border-radius: 2px; margin-left: 6px; vertical-align: middle; }
   .tag-entry { background: rgba(0,229,160,0.1); color: var(--accent); }
   .tag-exit { background: rgba(229,160,0,0.1); color: var(--warn); }
   .tag-risk { background: rgba(229,64,64,0.1); color: var(--danger); }
   .tag-size { background: rgba(100,140,180,0.1); color: #6496C8; }
 
   /* SCANNER */
-  .scanner-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .scanner-step {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 10px 12px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-  }
-
-  .step-check {
-    width: 16px;
-    height: 16px;
-    border: 1px solid var(--border2);
-    border-radius: 2px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 1px;
-    transition: all 0.15s;
-  }
-
-  .step-check:hover { border-color: var(--accent); }
-  .step-check.checked { background: var(--accent); border-color: var(--accent); }
-  .step-check.checked::after { content: '✓'; font-size: 9px; color: var(--bg); font-weight: 700; }
-
-  .step-content { flex: 1; }
-  .step-title { font-size: 12px; color: var(--text); font-weight: 500; }
-  .step-detail { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-
-  /* DENYLIST */
-  .denylist {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .deny-ticker {
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 4px 10px;
-    background: rgba(229,64,64,0.08);
-    border: 1px solid rgba(229,64,64,0.2);
-    color: var(--danger);
-    border-radius: 2px;
-    letter-spacing: 0.05em;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .deny-reason {
-    color: var(--text-muted);
-    font-size: 9px;
-    border-left: 1px solid rgba(229,64,64,0.2);
-    padding-left: 6px;
-  }
-
-  /* RIGHT PANEL */
-  .right-panel {
-    border-left: 1px solid var(--border);
-    background: var(--surface);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .panel-block {
-    border-bottom: 1px solid var(--border);
-    padding: 14px;
-  }
-
-  .panel-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-
-  /* STATS ROW */
-  .stats-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .stat-box {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 10px;
-  }
-
-  .stat-val {
-    font-family: var(--mono);
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1;
-  }
-
-  .stat-val.up { color: var(--accent); }
-  .stat-val.down { color: var(--danger); }
-
-  .stat-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text-muted);
-    letter-spacing: 0.1em;
-    margin-top: 4px;
-    text-transform: uppercase;
-  }
+  .deny-ticker { font-family: var(--mono); font-size: 10px; padding: 4px 10px; background: rgba(229,64,64,0.08); border: 1px solid rgba(229,64,64,0.2); color: var(--danger); border-radius: 2px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px; }
+  .deny-reason { color: var(--text-muted); font-size: 9px; border-left: 1px solid rgba(229,64,64,0.2); padding-left: 6px; }
+  .denylist { display: flex; flex-wrap: wrap; gap: 6px; }
 
   /* SIGNAL LOG */
-  .signal-entry {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
+  .signal-entry { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .signal-entry:last-child { border-bottom: none; }
-
-  .signal-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .signal-ticker {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    letter-spacing: 0.05em;
-  }
-
-  .signal-result {
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 600;
-  }
-
+  .signal-top { display: flex; justify-content: space-between; align-items: center; }
+  .signal-ticker { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: 0.05em; }
+  .signal-result { font-family: var(--mono); font-size: 11px; font-weight: 600; }
   .signal-result.win { color: var(--accent); }
   .signal-result.loss { color: var(--danger); }
   .signal-result.open { color: var(--warn); }
+  .signal-meta { font-family: var(--mono); font-size: 9px; color: var(--text-muted); }
+  .signal-note { font-size: 10px; color: var(--text-muted); font-style: italic; margin-top: 2px; }
 
-  .signal-meta {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
-  }
+  /* STATS */
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 10px; }
+  .stat-val { font-family: var(--mono); font-size: 18px; font-weight: 600; color: var(--text); line-height: 1; }
+  .stat-val.up { color: var(--accent); }
+  .stat-val.down { color: var(--danger); }
+  .stat-label { font-family: var(--mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.1em; margin-top: 4px; text-transform: uppercase; }
 
-  .signal-note {
-    font-size: 10px;
-    color: var(--text-muted);
-    font-style: italic;
-    margin-top: 2px;
-  }
-
-  /* PLAYBOOK SUMMARY */
-  .playbook-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
+  /* PLAYBOOK */
+  .playbook-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
   .playbook-row:last-child { border-bottom: none; }
-
-  .playbook-key {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text-muted);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .playbook-val {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text);
-    text-align: right;
-    max-width: 140px;
-  }
-
+  .playbook-key { font-family: var(--mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .playbook-val { font-family: var(--mono); font-size: 10px; color: var(--text); text-align: right; max-width: 160px; }
   .playbook-val.accent { color: var(--accent); }
+
+  /* RIGHT PANEL */
+  .right-panel { border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; display: flex; flex-direction: column; }
+  .panel-block { border-bottom: 1px solid var(--border); padding: 14px; }
+  .panel-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; }
+
+  /* INPUTS / BUTTONS */
+  .os-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 7px 10px; font-family: var(--mono); font-size: 11px; color: var(--text); outline: none; transition: border-color 0.15s; width: 100%; }
+  .os-input:focus { border-color: var(--border2); }
+  .os-input::placeholder { color: var(--text-dim); }
+  select.os-input { cursor: pointer; }
+  .os-btn { background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.2); color: var(--accent); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; padding: 7px 14px; border-radius: 3px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; white-space: nowrap; }
+  .os-btn:hover { background: var(--accent-mid); }
+  .os-btn-sm { padding: 4px 10px; font-size: 9px; }
+  .os-btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--text-muted); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; padding: 7px 14px; border-radius: 3px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; }
+  .os-btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+  .add-row { display: flex; gap: 8px; margin-top: 10px; }
 
   /* SCROLLBAR */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
-  /* SECTION TABS */
-  .tab-bar {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 16px;
-  }
-
-  .tab {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    padding: 8px 14px;
-    cursor: pointer;
-    color: var(--text-muted);
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-  }
-
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* ADD ENTRY */
-  .add-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-  }
-
-  .os-input {
-    flex: 1;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 7px 10px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .os-input:focus { border-color: var(--border2); }
-  .os-input::placeholder { color: var(--text-dim); }
-
-  .os-btn {
-    background: var(--accent-dim);
-    border: 1px solid rgba(0,229,160,0.2);
-    color: var(--accent);
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    padding: 7px 14px;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-transform: uppercase;
-  }
-
-  .os-btn:hover { background: var(--accent-mid); }
-
-  .os-btn-sm {
-    padding: 4px 10px;
-    font-size: 9px;
-  }
+  /* SCAN LOADING */
+  .scan-dots { display: flex; gap: 4px; justify-content: center; margin-top: 8px; }
+  .scan-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+  .scan-dot:nth-child(1) { animation: pulse 1.2s ease-in-out infinite; }
+  .scan-dot:nth-child(2) { animation: pulse 1.2s ease-in-out 0.4s infinite; }
+  .scan-dot:nth-child(3) { animation: pulse 1.2s ease-in-out 0.8s infinite; }
 </style>
 </head>
 <body>
-<div class="os-shell">
 
-  <!-- TOP BAR -->
+<!-- TICKER TAPE -->
+<div class="ticker-tape">
+  <div class="tape-track" id="tape-track">
+    <!-- Duplicated for seamless loop -->
+    <div class="tape-item"><span class="tape-sym">SPY</span><span class="tape-price" id="t-SPY-p">—</span><span class="tape-chg flat" id="t-SPY-c">—</span></div>
+    <div class="tape-item"><span class="tape-sym">QQQ</span><span class="tape-price" id="t-QQQ-p">—</span><span class="tape-chg flat" id="t-QQQ-c">—</span></div>
+    <div class="tape-item"><span class="tape-sym">VIX</span><span class="tape-price" id="t-VIX-p">—</span><span class="tape-chg flat" id="t-VIX-c">—</span></div>
+    <div class="tape-item"><span class="tape-sym">DXY</span><span class="tape-price" id="t-DXY-p">—</span><span class="tape-chg flat" id="t-DXY-c">—</span></div>
+    <div class="tape-item"><span class="tape-sym">TLT</span><span class="tape-price" id="t-TLT-p">—</span><span class="tape-chg flat" id="t-TLT-c">—</span></div>
+    <div class="tape-item"><span class="tape-sym">IWM</span><span class="tape-price" id="t-IWM-p">—</span><span class="tape-chg flat" id="t-IWM-c">—</span></div>
+    <div class="tape-alert"><span class="tape-alert-dot"></span><span id="macro-alert-text">MACRO WATCH — Loading news feed...</span></div>
+    <!-- Duplicate for loop -->
+    <div class="tape-item"><span class="tape-sym">SPY</span><span class="tape-price" id="t-SPY-p2">—</span><span class="tape-chg flat" id="t-SPY-c2">—</span></div>
+    <div class="tape-item"><span class="tape-sym">QQQ</span><span class="tape-price" id="t-QQQ-p2">—</span><span class="tape-chg flat" id="t-QQQ-c2">—</span></div>
+    <div class="tape-item"><span class="tape-sym">VIX</span><span class="tape-price" id="t-VIX-p2">—</span><span class="tape-chg flat" id="t-VIX-c2">—</span></div>
+    <div class="tape-item"><span class="tape-sym">DXY</span><span class="tape-price" id="t-DXY-p2">—</span><span class="tape-chg flat" id="t-DXY-c2">—</span></div>
+    <div class="tape-item"><span class="tape-sym">TLT</span><span class="tape-price" id="t-TLT-p2">—</span><span class="tape-chg flat" id="t-TLT-c2">—</span></div>
+    <div class="tape-item"><span class="tape-sym">IWM</span><span class="tape-price" id="t-IWM-p2">—</span><span class="tape-chg flat" id="t-IWM-c2">—</span></div>
+    <div class="tape-alert"><span class="tape-alert-dot"></span><span>MACRO WATCH — Hover to pause</span></div>
+  </div>
+</div>
+
+<div class="os-shell">
+  <!-- TOPBAR -->
   <header class="topbar">
     <div class="topbar-left">
       <div class="signal-mark">
@@ -569,269 +302,260 @@
         <span class="os-title">First Signal</span>
       </div>
       <span class="os-sub">// COMMAND</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:0.05em;" id="session-phase-label"></span>
     </div>
     <div class="topbar-right">
+      <div style="display:flex;gap:6px;" id="phase-switcher">
+        <span class="phase-badge" onclick="switchPhase('premarket')">Pre-Market</span>
+        <span class="phase-badge" onclick="switchPhase('market')">Market</span>
+        <span class="phase-badge" onclick="switchPhase('postmarket')">Post-Session</span>
+      </div>
       <span class="clock" id="clock">--:--:-- EST</span>
-      <span class="status-pill" id="market-status">CLOSED</span>
+      <span class="status-pill status-closed" id="market-status">CLOSED</span>
     </div>
   </header>
 
   <!-- LEFT NAV -->
   <nav class="nav">
-    <div class="nav-section-label">Core</div>
-    <a class="nav-item active" onclick="showSection('rules')">
-      <span class="nav-icon">⚡</span> Rules
-    </a>
-    <a class="nav-item" onclick="showSection('scanner')">
-      <span class="nav-icon">◎</span> Scanner
-    </a>
-    <a class="nav-item" onclick="showSection('log')">
-      <span class="nav-icon">▤</span> Signal Log
-    </a>
-
+    <div class="nav-section-label">Session</div>
+    <a class="nav-item active" onclick="showSection('session', this)"><span class="nav-icon">◈</span> Today</a>
     <div class="nav-divider"></div>
-    <div class="nav-section-label">Defense</div>
-    <a class="nav-item" onclick="showSection('denylist')">
-      <span class="nav-icon">✕</span> Denylist
-    </a>
-    <a class="nav-item" onclick="showSection('playbook')">
-      <span class="nav-icon">≡</span> Playbook
-    </a>
-
+    <div class="nav-section-label">Tools</div>
+    <a class="nav-item" onclick="showSection('scanner', this)"><span class="nav-icon">◎</span> Scanner</a>
+    <a class="nav-item" onclick="showSection('log', this)"><span class="nav-icon">▤</span> Signal Log</a>
+    <div class="nav-divider"></div>
+    <div class="nav-section-label">Reference</div>
+    <a class="nav-item" onclick="showSection('rules', this)"><span class="nav-icon">⚡</span> Rules</a>
+    <a class="nav-item" onclick="showSection('playbook', this)"><span class="nav-icon">≡</span> Playbook</a>
+    <a class="nav-item" onclick="showSection('denylist', this)"><span class="nav-icon">✕</span> Denylist</a>
     <div class="nav-divider"></div>
     <div class="nav-section-label">Links</div>
-    <a class="nav-item" href="https://drive.google.com" target="_blank">
-      <span class="nav-icon">↗</span> FirstSignal Doc
-    </a>
-    <a class="nav-item" href="https://finviz.com/screener?v=111&f=cap_smallover%2Csh_avgvol_o300%2Cta_sma200_pa%2Cta_sma50_pa&ft=4" target="_blank">
-      <span class="nav-icon">↗</span> Finviz Scanner
-    </a>
-    <a class="nav-item" href="https://unusualwhales.com" target="_blank">
-      <span class="nav-icon">↗</span> Unusual Whales
-    </a>
-
+    <a class="nav-item" href="https://drive.google.com" target="_blank"><span class="nav-icon">↗</span> FS Doc</a>
+    <a class="nav-item" href="https://finviz.com/screener?v=111&s=ta_unusualvolume&f=cap_small,geo_usa,ta_sma200_pa,ta_sma50_pa&ft=4" target="_blank"><span class="nav-icon">↗</span> Finviz</a>
+    <a class="nav-item" href="https://unusualwhales.com" target="_blank"><span class="nav-icon">↗</span> Unusual Whales</a>
+    <a class="nav-item" href="https://capitoltrades.com" target="_blank"><span class="nav-icon">↗</span> Capitol Trades</a>
     <div class="nav-bottom">
       <div class="nav-divider"></div>
-      <div class="nav-section-label">v1.0 // PRIVATE</div>
+      <div class="nav-section-label" id="version-label">v1.1 // PRIVATE</div>
     </div>
   </nav>
 
-  <!-- MAIN -->
+  <!-- MAIN CONTENT -->
   <main class="main">
 
-    <!-- RULES SECTION -->
-    <div id="section-rules" class="tab-content active">
-      <div class="section-header">
-        <div class="section-title">Execution Rules</div>
-        <span class="os-btn os-btn-sm" onclick="addRule()">+ Rule</span>
-      </div>
-      <div class="rules-grid" id="rules-grid">
-        <div class="rule-item">
-          <span class="rule-num">R-01</span>
-          <span class="rule-text">Unusual flow signal required before entry<span class="rule-tag tag-entry">ENTRY</span></span>
+    <!-- SESSION LANDING -->
+    <div id="section-session" class="tab-content active">
+      <div class="session-landing">
+        <div>
+          <div class="session-date-bar" id="session-date-bar">—</div>
+          <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px;">Trading Session</div>
+          <div style="font-size:12px;color:var(--text-muted);" id="session-summary-line">Select a phase to begin or continue today's session.</div>
         </div>
-        <div class="rule-item">
-          <span class="rule-num">R-02</span>
-          <span class="rule-text">Pre-move entries only — under ~10% intraday move<span class="rule-tag tag-entry">ENTRY</span></span>
+
+        <div class="phase-grid">
+          <!-- PRE-MARKET -->
+          <div class="phase-card" id="phase-card-premarket" onclick="enterPhase('premarket')">
+            <div class="phase-card-header">
+              <span class="phase-name">Phase 1</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="phase-tag tag-skip" id="phase-tag-premarket">4:00 – 9:30 AM</span>
+                <div class="phase-status-dot" id="phase-dot-premarket"></div>
+              </div>
+            </div>
+            <div class="phase-title">Pre-Market Research</div>
+            <div class="phase-desc">Scan Finviz, pull unusual flow candidates, build your watchlist, identify catalysts and optimal strikes.</div>
+            <div class="phase-time" id="phase-time-premarket">Not started</div>
+          </div>
+
+          <!-- MARKET OPEN -->
+          <div class="phase-card" id="phase-card-market" onclick="enterPhase('market')">
+            <div class="phase-card-header">
+              <span class="phase-name">Phase 2</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="phase-tag tag-skip" id="phase-tag-market">9:30 AM – 4:00 PM</span>
+                <div class="phase-status-dot" id="phase-dot-market"></div>
+              </div>
+            </div>
+            <div class="phase-title">Market Session</div>
+            <div class="phase-desc">Execute, monitor positions, refine thesis, log trades. AI assistant stays in context from pre-market research.</div>
+            <div class="phase-time" id="phase-time-market">Not started</div>
+          </div>
+
+          <!-- MID SESSION -->
+          <div class="phase-card" id="phase-card-midmarket" onclick="enterPhase('midmarket')">
+            <div class="phase-card-header">
+              <span class="phase-name">Phase 3</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="phase-tag tag-skip" id="phase-tag-midmarket">Mid-Day</span>
+                <div class="phase-status-dot" id="phase-dot-midmarket"></div>
+              </div>
+            </div>
+            <div class="phase-title">Mid-Session Check</div>
+            <div class="phase-desc">Review open positions, reassess thesis, scan for new setups, manage risk on open trades.</div>
+            <div class="phase-time" id="phase-time-midmarket">Not started</div>
+          </div>
+
+          <!-- POST SESSION -->
+          <div class="phase-card" id="phase-card-postmarket" onclick="enterPhase('postmarket')">
+            <div class="phase-card-header">
+              <span class="phase-name">Phase 4</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="phase-tag tag-skip" id="phase-tag-postmarket">4:00 PM+</span>
+                <div class="phase-status-dot" id="phase-dot-postmarket"></div>
+              </div>
+            </div>
+            <div class="phase-title">Post-Session Review</div>
+            <div class="phase-desc">Log all trades, review performance, extract lessons, prep watchlist and thesis for tomorrow.</div>
+            <div class="phase-time" id="phase-time-postmarket">Not started</div>
+          </div>
         </div>
-        <div class="rule-item">
-          <span class="rule-num">R-03</span>
-          <span class="rule-text">0DTE/short-DTE OTM calls, $0.02–0.08 entry<span class="rule-tag tag-size">SIZE</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-04</span>
-          <span class="rule-text">Swing entries: $0.40–0.65 premium range<span class="rule-tag tag-size">SIZE</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-05</span>
-          <span class="rule-text">One reload rule — no averaging down beyond one add<span class="rule-tag tag-risk">RISK</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-06</span>
-          <span class="rule-text">Kelly sizing — size to conviction, not emotion<span class="rule-tag tag-size">SIZE</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-07</span>
-          <span class="rule-text">No earnings plays — catalyst timing risk too high<span class="rule-tag tag-risk">RISK</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-08</span>
-          <span class="rule-text">SMID caps only — unless unusual conviction on mega cap<span class="rule-tag tag-entry">ENTRY</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-09</span>
-          <span class="rule-text">Always hedge — no naked directional exposure without offset<span class="rule-tag tag-risk">RISK</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-10</span>
-          <span class="rule-text">Sell on premium expansion — strike price does NOT need to be reached<span class="rule-tag tag-exit">EXIT</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-11</span>
-          <span class="rule-text">Thesis drives entry, technicals time it — weak tech ≠ dead trade, wait<span class="rule-tag tag-entry">ENTRY</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-21</span>
-          <span class="rule-text">Mega cap strike: near-ATM only, delta minimum 0.20<span class="rule-tag tag-entry">ENTRY</span></span>
-        </div>
-        <div class="rule-item">
-          <span class="rule-num">R-22</span>
-          <span class="rule-text">Prior day run filter — check if move already happened yesterday<span class="rule-tag tag-entry">ENTRY</span></span>
+
+        <!-- TODAY'S SCAN RESULTS if any -->
+        <div id="session-picks-block" style="display:none;">
+          <div class="section-header">
+            <div class="section-title">Today's Top Picks</div>
+          </div>
+          <div id="session-picks-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
         </div>
       </div>
     </div>
 
-    <!-- SCANNER SECTION -->
+    <!-- PHASE WORKSPACE -->
+    <div id="section-workspace" class="tab-content">
+      <div class="workspace-header">
+        <span class="back-btn" onclick="showSection('session', null); exitWorkspace()">← Session</span>
+        <div class="section-title" id="workspace-title">Phase</div>
+        <span class="os-btn os-btn-sm" onclick="logTradeFromWorkspace()" style="margin-left:auto;">+ Log Trade</span>
+      </div>
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+          <input class="os-input" id="chat-input" placeholder="Ask anything — research a ticker, check a thesis, discuss a position..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
+          <span class="os-btn" onclick="sendChat()" id="chat-send-btn">Send</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCANNER -->
     <div id="section-scanner" class="tab-content">
       <div class="section-header">
         <div class="section-title">Signal Scanner</div>
       </div>
-
-      <!-- MANUAL TICKER LOOKUP -->
       <div class="card" style="margin-bottom:12px;">
         <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Ticker Deep Scan</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <input class="os-input" id="scan-ticker" placeholder="Enter ticker (e.g. NVDA)" style="text-transform:uppercase;">
+          <input class="os-input" id="scan-ticker" placeholder="Ticker (e.g. NVDA)" style="text-transform:uppercase;">
           <span class="os-btn" onclick="runTickerScan()" id="scan-btn">▶ Scan</span>
         </div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);">
-          Runs ticker against all FirstSignal rules — checks intraday move, prior day run, denylist, insider activity via FMP, flow signals. Returns GO / NO-GO verdict.
-        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);">GO / NO-GO / WATCHLIST verdict against all FirstSignal rules. Denylist auto-checked.</div>
       </div>
-
-      <!-- SCAN RESULTS -->
+      <div id="scan-loading" style="display:none;padding:20px 0;text-align:center;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;" id="scan-loading-text">SCANNING...</div>
+        <div class="scan-dots"><div class="scan-dot"></div><div class="scan-dot"></div><div class="scan-dot"></div></div>
+      </div>
       <div id="scan-results" style="display:none;">
         <div class="card">
           <div id="scan-output" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;"></div>
         </div>
-      </div>
-
-      <!-- SCAN LOADING -->
-      <div id="scan-loading" style="display:none;padding:20px 0;text-align:center;">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;" id="scan-loading-text">SCANNING...</div>
-        <div style="margin-top:8px;display:flex;gap:4px;justify-content:center;" id="scan-dots">
-          <div style="width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite;"></div>
-          <div style="width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out 0.4s infinite;"></div>
-          <div style="width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out 0.8s infinite;"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <span class="os-btn os-btn-sm" id="scan-add-watchlist" onclick="addScanToWatchlist()">+ Add to Watchlist</span>
+          <span class="os-btn os-btn-sm" style="background:transparent;border-color:var(--border2);color:var(--text-muted);" onclick="document.getElementById('scan-results').style.display='none'">Clear</span>
         </div>
       </div>
-
       <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
         <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">Finviz Screen</div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-bottom:10px;">Small cap+, avg vol 300k+, above 50MA + 200MA. Open to pull today's list manually then paste tickers above to scan each.</div>
-        <a href="https://finviz.com/screener?v=111&f=cap_smallover%2Csh_avgvol_o300%2Cta_sma200_pa%2Cta_sma50_pa&ft=4" target="_blank" class="os-btn os-btn-sm" style="display:inline-block;text-decoration:none;">↗ Open Finviz Screen</a>
+        <a href="https://finviz.com/screener?v=111&s=ta_unusualvolume&f=cap_small,geo_usa,ta_sma200_pa,ta_sma50_pa&ft=4" target="_blank" class="os-btn os-btn-sm" style="display:inline-block;text-decoration:none;">↗ Open Finviz</a>
       </div>
     </div>
 
-    <!-- SIGNAL LOG SECTION -->
+    <!-- SIGNAL LOG -->
     <div id="section-log" class="tab-content">
       <div class="section-header">
         <div class="section-title">Signal Log</div>
         <span class="os-btn os-btn-sm" onclick="showAddTrade()">+ Entry</span>
       </div>
-      <div id="add-trade-form" style="display:none; margin-bottom:12px;">
+      <div id="add-trade-form" style="display:none;margin-bottom:12px;">
         <div class="card card-sm">
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
             <input class="os-input" id="t-ticker" placeholder="Ticker">
             <input class="os-input" id="t-strike" placeholder="Strike / Expiry">
             <input class="os-input" id="t-entry" placeholder="Entry $">
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-            <input class="os-input" id="t-result" placeholder="Result (e.g. +215% or -100%)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <input class="os-input" id="t-result" placeholder="Result (e.g. +215%)">
             <select class="os-input" id="t-status">
               <option value="open">Open</option>
               <option value="win">Win</option>
               <option value="loss">Loss</option>
             </select>
           </div>
-          <input class="os-input" id="t-note" placeholder="Thesis / Notes" style="width:100%; margin-bottom:8px;">
-          <div style="display:flex; gap:8px;">
+          <input class="os-input" id="t-note" placeholder="Thesis / Notes" style="margin-bottom:8px;">
+          <div style="display:flex;gap:8px;">
             <span class="os-btn os-btn-sm" onclick="addTrade()">Log Trade</span>
-            <span class="os-btn os-btn-sm" style="background:transparent;border-color:var(--border2);color:var(--text-muted);" onclick="hideAddTrade()">Cancel</span>
+            <span class="os-btn-ghost os-btn-sm" onclick="hideAddTrade()" style="padding:4px 10px;font-size:9px;">Cancel</span>
           </div>
         </div>
       </div>
       <div id="signal-log-list"></div>
     </div>
 
-    <!-- DENYLIST SECTION -->
+    <!-- RULES -->
+    <div id="section-rules" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Execution Rules</div>
+        <span class="os-btn os-btn-sm" onclick="addRule()">+ Rule</span>
+      </div>
+      <div class="rules-grid" id="rules-grid">
+        <div class="rule-item"><span class="rule-num">R-01</span><span class="rule-text">Unusual flow signal required before entry<span class="rule-tag tag-entry">ENTRY</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-02</span><span class="rule-text">Pre-move entries only — under ~10% intraday move<span class="rule-tag tag-entry">ENTRY</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-03</span><span class="rule-text">0DTE/short-DTE OTM calls, $0.02–0.08 entry<span class="rule-tag tag-size">SIZE</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-04</span><span class="rule-text">Swing entries: $0.40–0.65 premium range<span class="rule-tag tag-size">SIZE</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-05</span><span class="rule-text">One reload rule — no averaging down beyond one add<span class="rule-tag tag-risk">RISK</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-06</span><span class="rule-text">Kelly sizing — size to conviction, not emotion<span class="rule-tag tag-size">SIZE</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-07</span><span class="rule-text">No earnings plays — catalyst timing risk too high<span class="rule-tag tag-risk">RISK</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-08</span><span class="rule-text">SMID caps only — unless unusual conviction on mega cap<span class="rule-tag tag-entry">ENTRY</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-09</span><span class="rule-text">Always hedge — no naked directional exposure<span class="rule-tag tag-risk">RISK</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-10</span><span class="rule-text">Sell on premium expansion — strike does NOT need to be reached<span class="rule-tag tag-exit">EXIT</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-11</span><span class="rule-text">Thesis drives entry, technicals time it<span class="rule-tag tag-entry">ENTRY</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-21</span><span class="rule-text">Mega cap: near-ATM only, delta minimum 0.20<span class="rule-tag tag-entry">ENTRY</span></span></div>
+        <div class="rule-item"><span class="rule-num">R-22</span><span class="rule-text">Prior day run filter — big move yesterday = disqualified<span class="rule-tag tag-entry">ENTRY</span></span></div>
+      </div>
+    </div>
+
+    <!-- PLAYBOOK -->
+    <div id="section-playbook" class="tab-content">
+      <div class="section-header"><div class="section-title">Trading Playbook</div></div>
+      <div class="card">
+        <div class="playbook-row"><span class="playbook-key">Strategy</span><span class="playbook-val accent">0DTE / Short-DTE OTM Calls</span></div>
+        <div class="playbook-row"><span class="playbook-key">Entry (0DTE)</span><span class="playbook-val">$0.02 – $0.08 premium</span></div>
+        <div class="playbook-row"><span class="playbook-key">Entry (Swing)</span><span class="playbook-val">$0.40 – $0.65 premium</span></div>
+        <div class="playbook-row"><span class="playbook-key">Signal Required</span><span class="playbook-val">Unusual flow — Unusual Whales</span></div>
+        <div class="playbook-row"><span class="playbook-key">Exit Trigger</span><span class="playbook-val">Premium expansion — NOT ITM</span></div>
+        <div class="playbook-row"><span class="playbook-key">Sizing</span><span class="playbook-val">Kelly criterion</span></div>
+        <div class="playbook-row"><span class="playbook-key">Hedge</span><span class="playbook-val">~10% of position size</span></div>
+        <div class="playbook-row"><span class="playbook-key">Reload Rule</span><span class="playbook-val">Max 1 reload per position</span></div>
+        <div class="playbook-row"><span class="playbook-key">Earnings</span><span class="playbook-val" style="color:var(--danger)">Never — hard rule</span></div>
+        <div class="playbook-row"><span class="playbook-key">Universe</span><span class="playbook-val">SMID cap / mega cap near-ATM only</span></div>
+        <div class="playbook-row"><span class="playbook-key">Mega Cap Delta Min</span><span class="playbook-val">0.20 (Rule 21)</span></div>
+        <div class="playbook-row"><span class="playbook-key">Scanner</span><span class="playbook-val">Finviz unusual vol, above 50MA + 200MA</span></div>
+      </div>
+    </div>
+
+    <!-- DENYLIST -->
     <div id="section-denylist" class="tab-content">
       <div class="section-header">
         <div class="section-title">Signal Corruption Denylist</div>
-        <span class="os-btn os-btn-sm" onclick="addDeny()">+ Ticker</span>
+        <span class="os-btn os-btn-sm" onclick="showDenyAdd()">+ Ticker</span>
       </div>
       <div class="card">
-        <div class="denylist" id="denylist-container">
-          <div class="deny-ticker">TMHC <span class="deny-reason">Confirmed burn</span></div>
-          <div class="deny-ticker">RAMP <span class="deny-reason">Confirmed burn</span></div>
-          <div class="deny-ticker">GRRR <span class="deny-reason">Confirmed burn</span></div>
-        </div>
+        <div class="denylist" id="denylist-container"></div>
         <div class="add-row" id="deny-add-row" style="display:none;">
           <input class="os-input" id="deny-input" placeholder="Ticker">
           <input class="os-input" id="deny-reason-input" placeholder="Reason">
           <span class="os-btn os-btn-sm" onclick="confirmDeny()">Add</span>
         </div>
       </div>
-      <div style="margin-top:12px; font-family:var(--mono); font-size:10px; color:var(--text-muted);">
-        These tickers have demonstrated signal corruption — unusual flow did not translate to price movement. Hard pass regardless of setup quality.
-      </div>
-    </div>
-
-    <!-- PLAYBOOK SECTION -->
-    <div id="section-playbook" class="tab-content">
-      <div class="section-header">
-        <div class="section-title">Trading Playbook</div>
-      </div>
-      <div class="card">
-        <div class="playbook-row">
-          <span class="playbook-key">Strategy</span>
-          <span class="playbook-val accent">0DTE / Short-DTE OTM Calls</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Entry Range (0DTE)</span>
-          <span class="playbook-val">$0.02 – $0.08 premium</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Entry Range (Swing)</span>
-          <span class="playbook-val">$0.40 – $0.65 premium</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Signal Required</span>
-          <span class="playbook-val">Unusual options flow — InfoLib / UW</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Exit Trigger</span>
-          <span class="playbook-val">Premium expansion — NOT ITM</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Sizing</span>
-          <span class="playbook-val">Kelly criterion</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Reload Rule</span>
-          <span class="playbook-val">Max 1 reload per position</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Earnings</span>
-          <span class="playbook-val" style="color:var(--danger)">Never — hard rule</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Universe</span>
-          <span class="playbook-val">SMID cap primary / mega cap near-ATM only</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Mega Cap Delta Min</span>
-          <span class="playbook-val">0.20 (Rule 21)</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Primary Scanner</span>
-          <span class="playbook-val">Finviz unusual vol, above 50MA + 200MA</span>
-        </div>
-        <div class="playbook-row">
-          <span class="playbook-key">Flow Source</span>
-          <span class="playbook-val">InfoLib (browser only) + Unusual Whales</span>
-        </div>
-      </div>
+      <div style="margin-top:12px;font-family:var(--mono);font-size:10px;color:var(--text-muted);">Signal corruption confirmed — unusual flow did not translate. Hard pass regardless of setup.</div>
     </div>
 
   </main>
@@ -841,291 +565,485 @@
     <div class="panel-block">
       <div class="panel-label">Session Stats</div>
       <div class="stats-row">
-        <div class="stat-box">
-          <div class="stat-val" id="stat-trades">0</div>
-          <div class="stat-label">Trades</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val" id="stat-winrate">—</div>
-          <div class="stat-label">Win Rate</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val" id="stat-wins">0</div>
-          <div class="stat-label">Wins</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-val" id="stat-losses">0</div>
-          <div class="stat-label">Losses</div>
-        </div>
+        <div class="stat-box"><div class="stat-val" id="stat-trades">0</div><div class="stat-label">Trades</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-winrate">—</div><div class="stat-label">Win Rate</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-label">Wins</div></div>
+        <div class="stat-box"><div class="stat-val" id="stat-losses">0</div><div class="stat-label">Losses</div></div>
       </div>
     </div>
 
     <div class="panel-block">
-      <div class="panel-label">Quick Filters</div>
-      <div style="display:flex; flex-wrap:wrap; gap:6px;">
-        <span class="status-pill status-live" style="cursor:pointer;" onclick="filterLog('all')">ALL</span>
-        <span class="status-pill" style="background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,229,160,0.2);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:2px;" onclick="filterLog('win')">WINS</span>
-        <span class="status-pill status-closed" style="cursor:pointer;" onclick="filterLog('loss')">LOSSES</span>
-        <span class="status-pill" style="background:rgba(229,160,0,0.08);color:var(--warn);border:1px solid rgba(229,160,0,0.2);cursor:pointer;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:2px;" onclick="filterLog('open')">OPEN</span>
+      <div class="panel-label">Watchlist</div>
+      <div id="watchlist-panel" style="display:flex;flex-wrap:wrap;gap:6px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Empty — scan tickers to populate.</div>
       </div>
     </div>
 
-    <div class="panel-block" style="flex:1; overflow-y:auto;">
+    <div class="panel-block" style="flex:1;overflow-y:auto;">
       <div class="panel-label">Recent Signals</div>
-      <div id="recent-signals">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals logged yet.</div>
-      </div>
+      <div id="recent-signals"><div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals logged yet.</div></div>
     </div>
 
     <div class="panel-block">
-      <div class="panel-label">Key Links</div>
+      <div class="panel-label">Quick Links</div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <a href="https://finviz.com/screener?v=111&f=cap_smallover%2Csh_avgvol_o300%2Cta_sma200_pa%2Cta_sma50_pa&ft=4" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Finviz Scanner <span style="color:var(--accent)">↗</span></a>
+        <a href="https://finviz.com/screener?v=111&s=ta_unusualvolume&f=cap_small,geo_usa,ta_sma200_pa,ta_sma50_pa&ft=4" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Finviz <span style="color:var(--accent)">↗</span></a>
         <a href="https://unusualwhales.com" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Unusual Whales <span style="color:var(--accent)">↗</span></a>
         <a href="https://capitoltrades.com" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">Capitol Trades <span style="color:var(--accent)">↗</span></a>
         <a href="https://bigdata.com" target="_blank" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 0;display:flex;justify-content:space-between;">Bigdata.com <span style="color:var(--accent)">↗</span></a>
       </div>
     </div>
   </aside>
-
 </div>
 
 <script>
-  // CLOCK + MARKET STATUS
-  function updateClock() {
-    const now = new Date();
-    const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const h = String(est.getHours()).padStart(2,'0');
-    const m = String(est.getMinutes()).padStart(2,'0');
-    const s = String(est.getSeconds()).padStart(2,'0');
-    document.getElementById('clock').textContent = `${h}:${m}:${s} EST`;
+const SUPABASE_URL = 'https://unjffvoflowbqkbcbmhn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVuamZmdm9mbG93YnFrYmNibWhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjkxNDksImV4cCI6MjA5NjgwNTE0OX0.hL4S4UrshGdweiQ7apUMnK-iE2lzOgjtvWctzLAOA0c';
 
-    const totalMins = est.getHours() * 60 + est.getMinutes();
-    const isWeekday = est.getDay() > 0 && est.getDay() < 6;
-    const isOpen = isWeekday && totalMins >= 570 && totalMins < 960;
-    const statusEl = document.getElementById('market-status');
-    statusEl.textContent = isOpen ? 'MARKET OPEN' : 'CLOSED';
-    statusEl.className = 'status-pill ' + (isOpen ? 'status-live' : 'status-closed');
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
+// ─── SUPABASE HELPERS ───
+async function sbGet(table, params = '') {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  });
+  return r.json();
+}
+async function sbInsert(table, data) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(data)
+  });
+  return r.json();
+}
+async function sbUpsert(table, data, onConflict) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(data)
+  });
+  return r.json();
+}
 
-  // NAV
-  function showSection(id) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.getElementById('section-' + id).classList.add('active');
-    event.currentTarget.classList.add('active');
-  }
+// ─── STATE ───
+let trades = [];
+let watchlist = [];
+let denylistTickers = ['TMHC','RAMP','GRRR'];
+let chatHistory = [];
+let currentPhase = null;
+let todaySession = null;
+const TODAY = new Date().toISOString().split('T')[0];
 
-  // AI TICKER SCAN
-  const DENYLIST_TICKERS = ['TMHC','RAMP','GRRR'];
+// ─── CLOCK ───
+function updateClock() {
+  const est = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const h = String(est.getHours()).padStart(2,'0');
+  const m = String(est.getMinutes()).padStart(2,'0');
+  const s = String(est.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s} EST`;
+  const mins = est.getHours()*60 + est.getMinutes();
+  const isWeekday = est.getDay() > 0 && est.getDay() < 6;
+  const isOpen = isWeekday && mins >= 570 && mins < 960;
+  const isPre = isWeekday && mins >= 240 && mins < 570;
+  const el = document.getElementById('market-status');
+  if (isOpen) { el.textContent = 'MARKET OPEN'; el.className = 'status-pill status-live'; }
+  else if (isPre) { el.textContent = 'PRE-MARKET'; el.className = 'status-pill status-premarket'; }
+  else { el.textContent = 'CLOSED'; el.className = 'status-pill status-closed'; }
+  updatePhaseCards(est);
+}
+setInterval(updateClock, 1000);
+updateClock();
 
-  async function runTickerScan() {
-    const ticker = document.getElementById('scan-ticker').value.toUpperCase().trim();
-    if (!ticker) return;
+// ─── SESSION DATE ───
+function updatePhaseCards(est) {
+  const dateStr = est.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  document.getElementById('session-date-bar').textContent = dateStr;
+  const mins = est.getHours()*60 + est.getMinutes();
+  const isWeekday = est.getDay() > 0 && est.getDay() < 6;
 
-    document.getElementById('scan-results').style.display = 'none';
-    document.getElementById('scan-loading').style.display = 'block';
-    document.getElementById('scan-btn').textContent = '...';
-    document.getElementById('scan-btn').style.pointerEvents = 'none';
+  // Highlight current phase window
+  const phases = {
+    premarket: { start: 240, end: 570 },
+    market: { start: 570, end: 720 },
+    midmarket: { start: 720, end: 960 },
+    postmarket: { start: 960, end: 1440 }
+  };
+  Object.entries(phases).forEach(([id, range]) => {
+    const tag = document.getElementById(`phase-tag-${id}`);
+    if (!tag) return;
+    const isNow = isWeekday && mins >= range.start && mins < range.end;
+    if (isNow) { tag.textContent = 'NOW'; tag.className = 'phase-tag tag-now'; }
+  });
+}
 
-    const loadingPhrases = ['CHECKING DENYLIST...','PULLING INSIDER ACTIVITY...','ANALYZING FLOW SIGNALS...','STRESS TESTING RULES...','BUILDING VERDICT...'];
-    let pi = 0;
-    const phraseInterval = setInterval(() => {
-      document.getElementById('scan-loading-text').textContent = loadingPhrases[pi % loadingPhrases.length];
-      pi++;
-    }, 1200);
+// ─── NAV ───
+function showSection(id, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  if (el) el.classList.add('active');
+}
 
-    const isDenied = DENYLIST_TICKERS.includes(ticker);
+// ─── PHASE SYSTEM ───
+async function enterPhase(phase) {
+  currentPhase = phase;
+  const labels = { premarket: 'Pre-Market Research', market: 'Market Session', midmarket: 'Mid-Session Check', postmarket: 'Post-Session Review' };
+  const contexts = {
+    premarket: `You are in PRE-MARKET mode. Help scan for setups, research tickers from Finviz unusual volume screen, identify catalysts, suggest optimal strikes, and build the watchlist. Use FirstSignal rules. Ask the user what tickers they're looking at or suggest scanning Finviz first.`,
+    market: `You are in MARKET SESSION mode. The market is open. Help monitor positions, refine thesis, time entries, suggest exits when premium expands. Reference pre-market context. Be concise and fast — this is live trading time.`,
+    midmarket: `You are in MID-SESSION mode. Review any open positions from earlier. Check if thesis is still intact. Look for new setups. Help manage risk. Reference earlier session context.`,
+    postmarket: `You are in POST-SESSION mode. Help log today's trades, review performance, extract lessons from wins and losses, prep tomorrow's watchlist and key catalysts to watch.`
+  };
 
-    const systemPrompt = `You are the FirstSignal trading OS scanner. You analyze tickers against the FirstSignal rules and return a structured trade assessment.
+  document.getElementById('workspace-title').textContent = labels[phase];
+  document.getElementById('phase-dot-' + phase).className = 'phase-status-dot active';
+  document.getElementById('phase-tag-' + phase).textContent = 'ACTIVE';
+  document.getElementById('phase-tag-' + phase).className = 'phase-tag tag-now';
 
-FirstSignal Rules Summary:
-- Unusual flow signal required before entry (InfoLib / Unusual Whales)
-- Pre-move entries only — under ~10% intraday move, ideally under 5%
-- 0DTE/short-DTE OTM calls: $0.02–0.08 entry. Swings: $0.40–0.65
+  // Save session to Supabase
+  const sessionData = { session_date: TODAY };
+  sessionData[`${phase}_started_at`] = new Date().toISOString();
+  await sbUpsert('sessions', sessionData, 'session_date');
+
+  // Show workspace
+  showSection('workspace', null);
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  // Init chat with phase context
+  chatHistory = [{ role: 'user', content: `[SYSTEM: ${contexts[phase]}] Today is ${TODAY}. My denylist: ${denylistTickers.join(', ')}. My watchlist: ${watchlist.join(', ') || 'empty'}.` }];
+
+  // Clear messages and add greeting
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = '';
+  const greetings = {
+    premarket: `Pre-market session started.\n\nI'm ready to scan. What are you looking at? Drop tickers or say "run scan" and I'll walk you through Finviz → flow → catalyst → strike selection.`,
+    market: `Market is open. Let's move.\n\nWhat positions are you in? Or drop a ticker and I'll give you a live read against your rules.`,
+    midmarket: `Mid-session check. Halfway through.\n\nWhat's open? I'll help you decide hold vs exit and look for any new setups that emerged this morning.`,
+    postmarket: `Session closed. Time to review.\n\nDrop your trades and I'll help you log them, grade the execution, and prep tomorrow's focus list.`
+  };
+  appendChatMsg('assistant', greetings[phase]);
+  document.getElementById('chat-input').focus();
+}
+
+function exitWorkspace() {
+  currentPhase = null;
+}
+
+function switchPhase(phase) {
+  enterPhase(phase);
+  document.querySelectorAll('.phase-badge').forEach(b => b.classList.remove('active-phase'));
+  event.currentTarget.classList.add('active-phase');
+}
+
+// ─── CHAT ───
+function appendChatMsg(role, text) {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  const now = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'America/New_York' });
+  div.innerHTML = `<div class="chat-bubble">${text.replace(/\n/g,'<br>')}</div><div class="chat-meta">${role === 'user' ? 'You' : 'FirstSignal AI'} · ${now} EST</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  appendChatMsg('user', text);
+
+  const btn = document.getElementById('chat-send-btn');
+  btn.textContent = '...';
+  btn.style.pointerEvents = 'none';
+
+  chatHistory.push({ role: 'user', content: text });
+
+  const systemPrompt = `You are the FirstSignal trading OS — a private Bloomberg terminal and AI trading assistant for a solo options trader.
+
+FirstSignal Rules:
+- Unusual flow signal required before entry
+- Pre-move only — under 10% intraday move, ideally under 5%
+- 0DTE/short-DTE OTM calls: $0.02–$0.08 entry. Swings: $0.40–$0.65
 - One reload rule. Kelly sizing. No earnings plays.
-- SMID caps primary. Mega cap: near-ATM only, delta min 0.20 (Rule 21)
-- Check prior day run — if big move yesterday, filter disqualified (Rule 22)
-- Exit on premium expansion, NOT when strike is reached
-- Always hedge
-- Signal Corruption Denylist: TMHC, RAMP, GRRR — hard pass
+- SMID cap primary. Mega cap: near-ATM only, delta min 0.20 (Rule 21)
+- Prior day run filter (Rule 22)
+- Exit on premium expansion — NOT when strike is reached
+- Always hedge — 10% of position in hedge
+- Denylist: TMHC, RAMP, GRRR — hard pass
 
-Return your analysis in this exact format:
+Current phase: ${currentPhase || 'general'}
+Today: ${TODAY}
+Watchlist: ${watchlist.join(', ') || 'none'}
+
+Be direct, concise, institutional. No fluff. This is a live trading environment. When suggesting trades, always include: thesis, strike range, expiry type, entry range, hedge suggestion.`;
+
+  try {
+    const response = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: chatHistory.slice(-10)
+      })
+    });
+    const data = await response.json();
+    const reply = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
+    chatHistory.push({ role: 'assistant', content: reply });
+    appendChatMsg('assistant', reply);
+  } catch(err) {
+    appendChatMsg('assistant', `Error: ${err.message}`);
+  }
+
+  btn.textContent = 'Send';
+  btn.style.pointerEvents = 'auto';
+}
+
+// ─── TICKER SCAN ───
+async function runTickerScan() {
+  const ticker = document.getElementById('scan-ticker').value.toUpperCase().trim();
+  if (!ticker) return;
+  document.getElementById('scan-results').style.display = 'none';
+  document.getElementById('scan-loading').style.display = 'block';
+  const btn = document.getElementById('scan-btn');
+  btn.textContent = '...'; btn.style.pointerEvents = 'none';
+  const phrases = ['CHECKING DENYLIST...','PULLING INSIDER DATA...','ANALYZING FLOW...','STRESS TESTING RULES...','BUILDING VERDICT...'];
+  let pi = 0;
+  const interval = setInterval(() => { document.getElementById('scan-loading-text').textContent = phrases[pi++ % phrases.length]; }, 1200);
+  const isDenied = denylistTickers.includes(ticker);
+
+  try {
+    const response = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1200,
+        system: `You are the FirstSignal scanner. Analyze tickers against these rules:
+- Unusual flow signal required. Pre-move only (<10% intraday, ideally <5%).
+- 0DTE OTM calls $0.02-$0.08. Swings $0.40-$0.65.
+- One reload. Kelly sizing. No earnings. SMID cap primary.
+- Mega cap: near-ATM, delta min 0.20 (Rule 21). Prior day run check (Rule 22).
+- Exit on premium expansion. Always hedge at 10%.
+- Denylist: TMHC, RAMP, GRRR.
+
+Return EXACTLY this format:
 TICKER: [ticker]
 STATUS: [GO / NO-GO / WATCHLIST]
-INTRADAY MOVE: [current % move today if available]
-PRIOR DAY: [any significant prior day run?]
+INTRADAY MOVE: [%]
+PRIOR DAY: [notable move?]
 DENYLIST: [YES / NO]
-INSIDER ACTIVITY: [any recent Form 4 / insider buys or sells]
-FLOW SIGNALS: [any notable unusual options activity]
-TECHNICALS: [above/below 50MA and 200MA, any notable setup]
-THESIS: [1-2 sentence reason why this is or isn't a valid setup]
-SUGGESTED STRIKE RANGE: [if GO, suggest strike range and expiry type]
-VERDICT: [1 sentence final call]
+INSIDER ACTIVITY: [recent Form 4 activity]
+FLOW SIGNALS: [unusual options activity]
+TECHNICALS: [MA relationship, setup]
+THESIS: [1-2 sentences]
+SUGGESTED STRIKE RANGE: [specific range or NOT APPLICABLE]
+HEDGE SUGGESTION: [specific hedge play at 10% size]
+VERDICT: [1 sentence]`,
+        messages: [{ role: 'user', content: `Analyze ${ticker} right now.${isDenied ? ' THIS TICKER IS ON THE DENYLIST — immediate NO-GO.' : ''} Search for current data.` }]
+      })
+    });
+    const data = await response.json();
+    clearInterval(interval);
+    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
+    const colorized = text
+      .replace(/^(STATUS: )(GO)$/m, '$1<span style="color:var(--accent);font-weight:600;">$2 ✓</span>')
+      .replace(/^(STATUS: )(NO-GO)$/m, '$1<span style="color:var(--danger);font-weight:600;">$2 ✗</span>')
+      .replace(/^(STATUS: )(WATCHLIST)$/m, '$1<span style="color:var(--warn);font-weight:600;">$2 ◎</span>')
+      .replace(/^(TICKER:|INTRADAY MOVE:|PRIOR DAY:|DENYLIST:|INSIDER ACTIVITY:|FLOW SIGNALS:|TECHNICALS:|THESIS:|SUGGESTED STRIKE RANGE:|HEDGE SUGGESTION:|VERDICT:)/gm, '<span style="color:var(--text-muted);">$1</span>');
+    document.getElementById('scan-output').innerHTML = colorized;
+    document.getElementById('scan-loading').style.display = 'none';
+    document.getElementById('scan-results').style.display = 'block';
 
-Be direct. No fluff. This is an operational tool.`;
+    // Save scan to Supabase
+    const verdict = text.match(/STATUS: (GO|NO-GO|WATCHLIST)/)?.[1] || null;
+    await sbInsert('scans', { ticker, verdict, raw_output: text, phase: currentPhase, session_date: TODAY });
 
-    const userMsg = `Analyze ${ticker} for a FirstSignal trade setup right now. ${isDenied ? 'NOTE: This ticker is on the Signal Corruption Denylist — flag this immediately as NO-GO.' : ''} Pull whatever current data you can on price action, insider activity, options flow, and technicals. Run it against all FirstSignal rules and return your structured assessment.`;
-
-    try {
-      const response = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userMsg }]
-        })
-      });
-
-      const data = await response.json();
-      clearInterval(phraseInterval);
-
-      const text = data.content
-        .filter(b => b.type === 'text')
-        .map(b => b.text)
-        .join('\n')
-        .trim();
-
-      // Colorize output
-      const colorized = text
-        .replace(/^(STATUS: )(GO)$/m, '$1<span style="color:var(--accent);font-weight:600;">$2</span>')
-        .replace(/^(STATUS: )(NO-GO)$/m, '$1<span style="color:var(--danger);font-weight:600;">$2</span>')
-        .replace(/^(STATUS: )(WATCHLIST)$/m, '$1<span style="color:var(--warn);font-weight:600;">$2</span>')
-        .replace(/^(TICKER:|INTRADAY MOVE:|PRIOR DAY:|DENYLIST:|INSIDER ACTIVITY:|FLOW SIGNALS:|TECHNICALS:|THESIS:|SUGGESTED STRIKE RANGE:|VERDICT:)/gm,
-          '<span style="color:var(--text-muted);">$1</span>');
-
-      document.getElementById('scan-output').innerHTML = colorized;
-      document.getElementById('scan-loading').style.display = 'none';
-      document.getElementById('scan-results').style.display = 'block';
-
-    } catch(err) {
-      clearInterval(phraseInterval);
-      document.getElementById('scan-output').textContent = 'Scan failed — check connection.\n' + err.message;
-      document.getElementById('scan-loading').style.display = 'none';
-      document.getElementById('scan-results').style.display = 'block';
-    }
-
-    document.getElementById('scan-btn').textContent = '▶ Scan';
-    document.getElementById('scan-btn').style.pointerEvents = 'auto';
+    // Store for watchlist add
+    document.getElementById('scan-add-watchlist').dataset.ticker = ticker;
+    document.getElementById('scan-add-watchlist').dataset.verdict = verdict;
+  } catch(err) {
+    clearInterval(interval);
+    document.getElementById('scan-output').textContent = `Scan failed: ${err.message}`;
+    document.getElementById('scan-loading').style.display = 'none';
+    document.getElementById('scan-results').style.display = 'block';
   }
+  btn.textContent = '▶ Scan'; btn.style.pointerEvents = 'auto';
+}
 
-  document.getElementById('scan-ticker').addEventListener('keydown', e => {
-    if (e.key === 'Enter') runTickerScan();
-  });
+document.getElementById('scan-ticker').addEventListener('keydown', e => { if (e.key === 'Enter') runTickerScan(); });
 
-  // TRADE LOG
-  let trades = [];
+// ─── WATCHLIST ───
+function addScanToWatchlist() {
+  const btn = document.getElementById('scan-add-watchlist');
+  const ticker = btn.dataset.ticker;
+  const verdict = btn.dataset.verdict;
+  if (!ticker || watchlist.includes(ticker)) return;
+  watchlist.push(ticker);
+  renderWatchlist();
+}
 
-  function showAddTrade() {
-    document.getElementById('add-trade-form').style.display = 'block';
-  }
+function renderWatchlist() {
+  const panel = document.getElementById('watchlist-panel');
+  if (!watchlist.length) { panel.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Empty — scan tickers to populate.</div>'; return; }
+  panel.innerHTML = watchlist.map(t => `<span style="font-family:var(--mono);font-size:10px;padding:3px 8px;background:var(--accent-dim);border:1px solid rgba(0,229,160,0.2);color:var(--accent);border-radius:2px;cursor:pointer;" onclick="quickScan('${t}')">${t}</span>`).join('');
+}
 
-  function hideAddTrade() {
-    document.getElementById('add-trade-form').style.display = 'none';
-  }
+function quickScan(ticker) {
+  document.getElementById('scan-ticker').value = ticker;
+  showSection('scanner', null);
+  runTickerScan();
+}
 
-  function addTrade() {
-    const ticker = document.getElementById('t-ticker').value.toUpperCase().trim();
-    const strike = document.getElementById('t-strike').value.trim();
-    const entry = document.getElementById('t-entry').value.trim();
-    const result = document.getElementById('t-result').value.trim();
-    const status = document.getElementById('t-status').value;
-    const note = document.getElementById('t-note').value.trim();
-    if (!ticker) return;
+// ─── TRADE LOG ───
+async function loadTrades() {
+  const data = await sbGet('trades', `session_date=eq.${TODAY}&order=created_at.desc`);
+  if (Array.isArray(data)) { trades = data; renderLog(); updateStats(); }
+}
 
-    const now = new Date();
-    trades.unshift({ ticker, strike, entry, result, status, note, date: now.toLocaleDateString('en-US', { month:'short', day:'numeric' }) });
+function showAddTrade() { document.getElementById('add-trade-form').style.display = 'block'; }
+function hideAddTrade() { document.getElementById('add-trade-form').style.display = 'none'; }
 
-    ['t-ticker','t-strike','t-entry','t-result','t-note'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('t-status').value = 'open';
-    hideAddTrade();
-    renderLog();
-    updateStats();
-  }
+async function addTrade() {
+  const ticker = document.getElementById('t-ticker').value.toUpperCase().trim();
+  const strike = document.getElementById('t-strike').value.trim();
+  const entry_price = parseFloat(document.getElementById('t-entry').value) || null;
+  const result = document.getElementById('t-result').value.trim();
+  const status = document.getElementById('t-status').value;
+  const notes = document.getElementById('t-note').value.trim();
+  if (!ticker) return;
 
-  function renderLog(filter = 'all') {
-    const list = document.getElementById('signal-log-list');
-    const recent = document.getElementById('recent-signals');
-    const filtered = filter === 'all' ? trades : trades.filter(t => t.status === filter);
+  const result_pct = result ? parseFloat(result.replace('%','').replace('+','')) : null;
+  const trade = { ticker, strike, entry_price, result_pct, status, notes, phase: currentPhase, session_date: TODAY };
+  await sbInsert('trades', trade);
+  ['t-ticker','t-strike','t-entry','t-result','t-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('t-status').value = 'open';
+  hideAddTrade();
+  await loadTrades();
+}
 
-    if (filtered.length === 0) {
-      list.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:12px 0;">No entries.</div>';
-    } else {
-      list.innerHTML = filtered.map(t => `
-        <div class="signal-entry">
-          <div class="signal-top">
-            <span class="signal-ticker">${t.ticker}</span>
-            <span class="signal-result ${t.status}">${t.result || (t.status === 'open' ? 'OPEN' : '—')}</span>
-          </div>
-          <div class="signal-meta">${t.strike ? t.strike + ' · ' : ''}${t.entry ? 'Entry: $' + t.entry + ' · ' : ''}${t.date}</div>
-          ${t.note ? `<div class="signal-note">${t.note}</div>` : ''}
-        </div>
-      `).join('');
-    }
+function logTradeFromWorkspace() { showSection('log', null); showAddTrade(); }
 
-    recent.innerHTML = trades.slice(0,5).map(t => `
-      <div class="signal-entry">
-        <div class="signal-top">
-          <span class="signal-ticker">${t.ticker}</span>
-          <span class="signal-result ${t.status}">${t.result || (t.status === 'open' ? 'OPEN' : '—')}</span>
-        </div>
-        <div class="signal-meta">${t.date}</div>
+function renderLog(filter = 'all') {
+  const filtered = filter === 'all' ? trades : trades.filter(t => t.status === filter);
+  const list = document.getElementById('signal-log-list');
+  list.innerHTML = filtered.length ? filtered.map(t => `
+    <div class="signal-entry">
+      <div class="signal-top">
+        <span class="signal-ticker">${t.ticker}</span>
+        <span class="signal-result ${t.status}">${t.result_pct != null ? (t.result_pct > 0 ? '+' : '') + t.result_pct + '%' : t.status.toUpperCase()}</span>
       </div>
-    `).join('') || '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals logged yet.</div>';
-  }
+      <div class="signal-meta">${t.strike ? t.strike + ' · ' : ''}${t.entry_price ? 'Entry $' + t.entry_price + ' · ' : ''}${new Date(t.created_at).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>
+      ${t.notes ? `<div class="signal-note">${t.notes}</div>` : ''}
+    </div>`).join('') : '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:12px 0;">No entries.</div>';
 
-  function filterLog(f) { renderLog(f); }
+  // Recent signals panel
+  const recent = document.getElementById('recent-signals');
+  recent.innerHTML = trades.slice(0,5).map(t => `
+    <div class="signal-entry">
+      <div class="signal-top"><span class="signal-ticker">${t.ticker}</span><span class="signal-result ${t.status}">${t.result_pct != null ? (t.result_pct>0?'+':'')+t.result_pct+'%' : t.status.toUpperCase()}</span></div>
+      <div class="signal-meta">${new Date(t.created_at).toLocaleDateString()}</div>
+    </div>`).join('') || '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals yet.</div>';
+}
 
-  function updateStats() {
-    const wins = trades.filter(t => t.status === 'win').length;
-    const losses = trades.filter(t => t.status === 'loss').length;
-    const closed = wins + losses;
-    document.getElementById('stat-trades').textContent = trades.length;
-    document.getElementById('stat-wins').textContent = wins;
-    document.getElementById('stat-losses').textContent = losses;
-    document.getElementById('stat-winrate').textContent = closed ? Math.round(wins/closed*100)+'%' : '—';
-    document.getElementById('stat-winrate').className = 'stat-val' + (closed ? (wins/closed >= 0.5 ? ' up' : ' down') : '');
-  }
+function updateStats() {
+  const wins = trades.filter(t => t.status === 'win').length;
+  const losses = trades.filter(t => t.status === 'loss').length;
+  const closed = wins + losses;
+  document.getElementById('stat-trades').textContent = trades.length;
+  document.getElementById('stat-wins').textContent = wins;
+  document.getElementById('stat-losses').textContent = losses;
+  const wr = closed ? Math.round(wins/closed*100)+'%' : '—';
+  const wrEl = document.getElementById('stat-winrate');
+  wrEl.textContent = wr;
+  wrEl.className = 'stat-val' + (closed ? (wins/closed >= 0.5 ? ' up' : ' down') : '');
+}
 
+// ─── DENYLIST ───
+async function loadDenylist() {
+  const data = await sbGet('denylist', 'order=created_at.asc');
+  if (Array.isArray(data) && data.length) {
+    denylistTickers = data.map(d => d.ticker);
+    renderDenylist(data);
+  } else { renderDenylist(denylistTickers.map(t => ({ ticker: t, reason: 'Signal corruption confirmed' }))); }
+}
+
+function renderDenylist(items) {
+  document.getElementById('denylist-container').innerHTML = items.map(d =>
+    `<div class="deny-ticker">${d.ticker} <span class="deny-reason">${d.reason || ''}</span></div>`).join('');
+}
+
+function showDenyAdd() { document.getElementById('deny-add-row').style.display = 'flex'; document.getElementById('deny-input').focus(); }
+
+async function confirmDeny() {
+  const ticker = document.getElementById('deny-input').value.toUpperCase().trim();
+  const reason = document.getElementById('deny-reason-input').value.trim() || 'Signal corruption';
+  if (!ticker) return;
+  await sbInsert('denylist', { ticker, reason });
+  document.getElementById('deny-input').value = '';
+  document.getElementById('deny-reason-input').value = '';
+  document.getElementById('deny-add-row').style.display = 'none';
+  await loadDenylist();
+}
+
+// ─── MACRO TICKER TAPE ───
+async function fetchMacroTape() {
+  const syms = ['SPY','QQQ','VIX','TLT','IWM'];
+  try {
+    const r = await fetch(`/api/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 300,
+        system: 'Return ONLY a JSON object, no markdown. Format: {"SPY":{"price":"590.12","chg":"+0.34%"},"QQQ":{"price":"480.50","chg":"-0.12%"},"VIX":{"price":"18.20","chg":"+2.1%"},"TLT":{"price":"88.40","chg":"+0.05%"},"IWM":{"price":"205.10","chg":"+0.80%"},"alert":"Brief macro note under 80 chars"}',
+        messages: [{ role: 'user', content: 'Get current prices and changes for SPY, QQQ, VIX, TLT, IWM and one key macro alert for today. Return only JSON.' }]
+      })
+    });
+    const data = await r.json();
+    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    const json = JSON.parse(text.replace(/```json|```/g,'').trim());
+    syms.forEach(sym => {
+      if (!json[sym]) return;
+      const up = json[sym].chg?.startsWith('+');
+      const down = json[sym].chg?.startsWith('-');
+      ['',2].forEach(sfx => {
+        const pe = document.getElementById(`t-${sym}-p${sfx}`);
+        const ce = document.getElementById(`t-${sym}-c${sfx}`);
+        if (pe) pe.textContent = json[sym].price || '—';
+        if (ce) { ce.textContent = json[sym].chg || '—'; ce.className = `tape-chg ${up?'up':down?'down':'flat'}`; }
+      });
+    });
+    if (json.alert) document.getElementById('macro-alert-text').textContent = `MACRO // ${json.alert}`;
+  } catch(e) { console.log('Tape fetch failed:', e.message); }
+}
+
+// ─── ADD RULE ───
+let ruleCount = 23;
+function addRule() {
+  const text = prompt('New rule text:');
+  if (!text) return;
+  const grid = document.getElementById('rules-grid');
+  const el = document.createElement('div');
+  el.className = 'rule-item';
+  el.innerHTML = `<span class="rule-num">R-${String(ruleCount).padStart(2,'0')}</span><span class="rule-text">${text}</span>`;
+  grid.appendChild(el);
+  ruleCount++;
+}
+
+// ─── INIT ───
+async function init() {
+  await Promise.all([loadTrades(), loadDenylist()]);
   renderLog();
+  updateStats();
+  // Fetch macro tape after 2s delay to not block UI
+  setTimeout(fetchMacroTape, 2000);
+  // Refresh tape every 5 minutes
+  setInterval(fetchMacroTape, 300000);
+}
 
-  // DENYLIST
-  function addDeny() {
-    document.getElementById('deny-add-row').style.display = 'flex';
-    document.getElementById('deny-input').focus();
-  }
-
-  function confirmDeny() {
-    const ticker = document.getElementById('deny-input').value.toUpperCase().trim();
-    const reason = document.getElementById('deny-reason-input').value.trim() || 'Signal corruption';
-    if (!ticker) return;
-    const container = document.getElementById('denylist-container');
-    const el = document.createElement('div');
-    el.className = 'deny-ticker';
-    el.innerHTML = `${ticker} <span class="deny-reason">${reason}</span>`;
-    container.appendChild(el);
-    document.getElementById('deny-input').value = '';
-    document.getElementById('deny-reason-input').value = '';
-    document.getElementById('deny-add-row').style.display = 'none';
-  }
-
-  // RULE ADD
-  let ruleCount = 23;
-  function addRule() {
-    const text = prompt('Rule text:');
-    if (!text) return;
-    const grid = document.getElementById('rules-grid');
-    const el = document.createElement('div');
-    el.className = 'rule-item';
-    el.innerHTML = `<span class="rule-num">R-${String(ruleCount).padStart(2,'0')}</span><span class="rule-text">${text}</span>`;
-    grid.appendChild(el);
-    ruleCount++;
-  }
+init();
 </script>
 </body>
 </html>
