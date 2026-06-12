@@ -6,35 +6,33 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  try {
-    const body = { ...req.body };
-    // Remove web_search tool — requires special beta access, causes empty responses without it
-    delete body.tools;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
+
+  try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: req.body.system || 'You are a trading analysis assistant.',
+        messages: req.body.messages || []
+      })
     });
 
     const text = await response.text();
-
-    if (!text) {
-      return res.status(500).json({ error: 'Empty response from Anthropic API', status: response.status });
-    }
-
-    const data = JSON.parse(text);
-    res.status(200).json(data);
+    res.status(200).send(text || JSON.stringify({ error: 'empty response', status: response.status }));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 }
