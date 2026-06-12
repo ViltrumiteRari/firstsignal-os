@@ -782,7 +782,9 @@ Be direct, concise, institutional. No fluff. This is a live trading environment.
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5-20251001',
+        _model: 'claude-haiku-4-5-20251001',
+        _useWebSearch: false,
         max_tokens: 1000,
         system: systemPrompt,
         messages: chatHistory.slice(-10)
@@ -818,6 +820,10 @@ async function runTickerScan() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        _ticker: ticker,
+        _useCache: true,
+        _useWebSearch: true,
+        _model: 'claude-sonnet-4-6',
         model: 'claude-sonnet-4-6',
         max_tokens: 1200,
         system: `You are the FirstSignal scanner. Analyze tickers against these rules:
@@ -846,6 +852,14 @@ VERDICT: [1 sentence]`,
     });
     const data = await response.json();
     clearInterval(interval);
+
+    // Show cache notice if served from cache
+    if (data._cached) {
+      const cacheAge = Math.round((Date.now() - new Date(data._cached_at).getTime()) / 60000);
+      document.getElementById('scan-output').dataset.cacheNotice = `Cached ${cacheAge}m ago — `;
+    } else {
+      delete document.getElementById('scan-output').dataset.cacheNotice;
+    }
     const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
     const colorized = text
       .replace(/^(STATUS: )(GO)$/m, '$1<span style="color:var(--accent);font-weight:600;">$2 ✓</span>')
@@ -987,35 +1001,24 @@ async function confirmDeny() {
   await loadDenylist();
 }
 
-// ─── MACRO TICKER TAPE ───
+// ─── MACRO TICKER TAPE (free — no Claude calls) ───
 async function fetchMacroTape() {
-  const syms = ['SPY','QQQ','VIX','TLT','IWM'];
   try {
-    const r = await fetch(`/api/scan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 300,
-        system: 'Return ONLY a JSON object, no markdown. Format: {"SPY":{"price":"590.12","chg":"+0.34%"},"QQQ":{"price":"480.50","chg":"-0.12%"},"VIX":{"price":"18.20","chg":"+2.1%"},"TLT":{"price":"88.40","chg":"+0.05%"},"IWM":{"price":"205.10","chg":"+0.80%"},"alert":"Brief macro note under 80 chars"}',
-        messages: [{ role: 'user', content: 'Get current prices and changes for SPY, QQQ, VIX, TLT, IWM and one key macro alert for today. Return only JSON.' }]
-      })
-    });
-    const data = await r.json();
-    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('').trim();
-    const json = JSON.parse(text.replace(/```json|```/g,'').trim());
+    const r = await fetch('/api/tape');
+    if (!r.ok) return;
+    const json = await r.json();
+    const syms = ['SPY','QQQ','VIX','TLT','IWM'];
     syms.forEach(sym => {
       if (!json[sym]) return;
-      const up = json[sym].chg?.startsWith('+');
-      const down = json[sym].chg?.startsWith('-');
-      ['',2].forEach(sfx => {
+      const { price, chg, up } = json[sym];
+      const cls = `tape-chg ${up ? 'up' : 'down'}`;
+      ['','2'].forEach(sfx => {
         const pe = document.getElementById(`t-${sym}-p${sfx}`);
         const ce = document.getElementById(`t-${sym}-c${sfx}`);
-        if (pe) pe.textContent = json[sym].price || '—';
-        if (ce) { ce.textContent = json[sym].chg || '—'; ce.className = `tape-chg ${up?'up':down?'down':'flat'}`; }
+        if (pe) pe.textContent = price;
+        if (ce) { ce.textContent = chg; ce.className = cls; }
       });
     });
-    if (json.alert) document.getElementById('macro-alert-text').textContent = `MACRO // ${json.alert}`;
   } catch(e) { console.log('Tape fetch failed:', e.message); }
 }
 
@@ -1037,10 +1040,9 @@ async function init() {
   await Promise.all([loadTrades(), loadDenylist()]);
   renderLog();
   updateStats();
-  // Fetch macro tape after 2s delay to not block UI
-  setTimeout(fetchMacroTape, 2000);
-  // Refresh tape every 5 minutes
-  setInterval(fetchMacroTape, 300000);
+  // Free market data tape — no Claude calls
+  fetchMacroTape();
+  setInterval(fetchMacroTape, 60000);
 }
 
 init();
