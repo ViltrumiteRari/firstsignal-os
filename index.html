@@ -459,11 +459,30 @@
       </div>
       <div class="card" style="margin-bottom:12px;">
         <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px;">Ticker Deep Scan</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
           <input class="os-input" id="scan-ticker" placeholder="Ticker (e.g. NVDA)" style="text-transform:uppercase;">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;white-space:nowrap;" id="scan-live-price"></span>
           <span class="os-btn" onclick="runTickerScan()" id="scan-btn">▶ Scan</span>
         </div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);">GO / NO-GO / WATCHLIST verdict against all FirstSignal rules. Denylist auto-checked.</div>
+        <!-- SCAN DEPTH CHECKBOXES -->
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.08em;">
+            <input type="checkbox" id="chk-web" checked style="accent-color:var(--accent);"> WEB SEARCH
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.08em;">
+            <input type="checkbox" id="chk-insider" checked style="accent-color:var(--accent);"> INSIDER/FORM4
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.08em;">
+            <input type="checkbox" id="chk-flow" checked style="accent-color:var(--accent);"> FLOW SIGNALS
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.08em;">
+            <input type="checkbox" id="chk-senator" checked style="accent-color:var(--accent);"> SENATOR TRADES
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.08em;">
+            <input type="checkbox" id="chk-earnings" style="accent-color:var(--accent);"> EARNINGS CHECK
+          </label>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Uncheck items for faster, cheaper scans.</div>
       </div>
       <div id="scan-loading" style="display:none;padding:20px 0;text-align:center;">
         <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;" id="scan-loading-text">SCANNING...</div>
@@ -474,8 +493,29 @@
           <div id="scan-output" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <span class="os-btn os-btn-sm" id="scan-add-watchlist" onclick="addScanToWatchlist()">+ Add to Watchlist</span>
-          <span class="os-btn os-btn-sm" style="background:transparent;border-color:var(--border2);color:var(--text-muted);" onclick="document.getElementById('scan-results').style.display='none'">Clear</span>
+          <span class="os-btn os-btn-sm" id="scan-add-watchlist" onclick="addScanToWatchlist()">+ Watchlist</span>
+          <span class="os-btn os-btn-sm" onclick="runThesisAnalysis()" id="thesis-btn" style="display:none;">⚡ Thesis</span>
+          <span class="os-btn os-btn-sm" style="background:transparent;border-color:var(--border2);color:var(--text-muted);" onclick="clearScan()">Clear</span>
+        </div>
+      </div>
+
+      <!-- THESIS PANEL -->
+      <div id="thesis-panel" style="display:none;margin-top:12px;">
+        <div style="border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+          <div style="background:var(--surface2);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;">Trade Thesis — <span id="thesis-ticker-label">—</span></div>
+            <div style="display:flex;gap:6px;">
+              <span class="expiry-btn active-expiry" id="thesis-1w" onclick="setThesisWindow('1w')" style="flex:none;padding:3px 8px;">1 Week</span>
+              <span class="expiry-btn" id="thesis-3w" onclick="setThesisWindow('3w')" style="flex:none;padding:3px 8px;">3 Weeks</span>
+            </div>
+          </div>
+          <div id="thesis-loading" style="display:none;padding:16px;text-align:center;">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;">BUILDING THESIS...</div>
+            <div class="scan-dots" style="margin-top:8px;"><div class="scan-dot"></div><div class="scan-dot"></div><div class="scan-dot"></div></div>
+          </div>
+          <div id="thesis-content" style="padding:14px;font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;display:none;"></div>
+          <!-- CONSENSUS VERDICT -->
+          <div id="thesis-verdict" style="display:none;padding:14px;border-top:1px solid var(--border);"></div>
         </div>
       </div>
       <!-- STRIKE SELECTOR -->
@@ -640,6 +680,15 @@
     <div class="panel-block" style="flex:1;overflow-y:auto;">
       <div class="panel-label">Recent Signals</div>
       <div id="recent-signals"><div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:8px 0;">No signals logged yet.</div></div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label" style="display:flex;justify-content:space-between;align-items:center;">
+        STW Feed <span onclick="loadSTWFeed()" style="cursor:pointer;color:var(--accent);font-size:8px;">↺ Refresh</span>
+      </div>
+      <div id="stw-feed" style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Loading...</div>
+      </div>
     </div>
 
     <div class="panel-block">
@@ -936,6 +985,10 @@ VERDICT: [1 sentence]`,
     document.getElementById('scan-add-watchlist').dataset.ticker = ticker;
     document.getElementById('scan-add-watchlist').dataset.verdict = verdict;
 
+    // Store for thesis
+    lastScanTicker = ticker;
+    lastScanText = text;
+
     // Init strike selector with scan data
     initStrikeSelector(ticker, text);
   } catch(err) {
@@ -1101,14 +1154,238 @@ async function init() {
   await Promise.all([loadTrades(), loadDenylist()]);
   renderLog();
   updateStats();
-  // Free market data tape — no Claude calls
   fetchMacroTape();
   setInterval(fetchMacroTape, 60000);
+  // STW feed — loads silently, shows "no bot token" message if not configured
+  loadSTWFeed();
+  setInterval(loadSTWFeed, 120000);
 }
 
 init();
 
-// ─── STRIKE SELECTOR ───
+// ─── SCAN DEPTH SYSTEM ───
+function getScanInstructions() {
+  const web = document.getElementById('chk-web')?.checked;
+  const insider = document.getElementById('chk-insider')?.checked;
+  const flow = document.getElementById('chk-flow')?.checked;
+  const senator = document.getElementById('chk-senator')?.checked;
+  const earnings = document.getElementById('chk-earnings')?.checked;
+  const parts = [];
+  if (insider) parts.push('- Check recent Form 4 insider buying/selling activity');
+  if (senator) parts.push('- Check recent senator/congressional trades via Capitol Trades');
+  if (flow) parts.push('- Analyze unusual options flow — sweeps, large blocks, OI buildup');
+  if (earnings) parts.push('- Check upcoming earnings date and proximity risk');
+  if (!insider && !senator && !flow) parts.push('- Quick scan: technicals and price action only');
+  return { useWebSearch: web, instructions: parts.join('\n') };
+}
+
+function clearScan() {
+  document.getElementById('scan-results').style.display = 'none';
+  document.getElementById('strike-selector').style.display = 'none';
+  document.getElementById('thesis-panel').style.display = 'none';
+}
+
+// ─── LIVE PRICE IN SCANNER ───
+async function fetchLivePrice(ticker) {
+  try {
+    const r = await fetch(`/api/tape`);
+    const d = await r.json();
+    // tape only has macro symbols — for individual tickers use FMP
+    const r2 = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${ticker}?apikey=${window._fmpKey||''}`);
+    const d2 = await r2.json();
+    if (Array.isArray(d2) && d2[0]) {
+      const price = d2[0].price;
+      const el = document.getElementById('scan-live-price');
+      if (el) el.textContent = `$${price?.toFixed(2)}`;
+      return price;
+    }
+  } catch {}
+  return null;
+}
+
+// Update scan to use depth checkboxes and fetch live price
+const _origRunScan = runTickerScan;
+
+// ─── REAL EXPIRY DATES ───
+function getRealExpiryDates() {
+  const now = new Date();
+  const est = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const dates = [];
+  // Find next N Fridays (options expiry)
+  let d = new Date(est);
+  d.setHours(0,0,0,0);
+  for (let i = 0; dates.length < 6; i++) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() === 5) { // Friday
+      dates.push(new Date(d));
+    }
+  }
+  const fmt = (dt) => dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  const isToday = (dt) => dt.toDateString() === est.toDateString();
+  const isFriday = est.getDay() === 5;
+
+  return {
+    '0dte': isFriday ? `${fmt(est)} (Today)` : `${fmt(dates[0])} (Fri)`,
+    'week': fmt(dates[0]),
+    '2week': fmt(dates[1]),
+    'monthly': fmt(dates.find(d => d.getDate() >= 15 && d.getDate() <= 21) || dates[3])
+  };
+}
+
+// Override initStrikeSelector to use real dates
+const _origInitStrike = initStrikeSelector;
+function initStrikeSelector(ticker, scanText) {
+  const dates = getRealExpiryDates();
+  // Update expiry button labels with real dates
+  document.getElementById('exp-0dte').textContent = `0DTE · ${dates['0dte']}`;
+  document.getElementById('exp-week').textContent = `Week · ${dates['week']}`;
+  document.getElementById('exp-2week').textContent = `2Wk · ${dates['2week']}`;
+  document.getElementById('exp-monthly').textContent = `Monthly · ${dates['monthly']}`;
+
+  strikeState.ticker = ticker;
+  strikeState.expiryDates = dates;
+
+  // Try to get live price first
+  fetchLivePrice(ticker).then(livePrice => {
+    const priceMatch = scanText.match(/\$(\d+\.?\d*)/);
+    strikeState.price = livePrice || (priceMatch ? parseFloat(priceMatch[1]) : 100);
+    strikeState.scanData = parseScanData(scanText);
+    strikeState.direction = strikeState.scanData.verdict === 'NO-GO' ? 'puts' : 'calls';
+    document.getElementById('strike-selector').style.display = 'block';
+    document.getElementById('thesis-btn').style.display = 'inline-block';
+    renderStrikeGrid();
+    updateDirectionUI();
+  });
+}
+
+// ─── THESIS ANALYSIS ───
+let thesisWindow = '1w';
+let lastScanText = '';
+let lastScanTicker = '';
+
+function setThesisWindow(w) {
+  thesisWindow = w;
+  document.getElementById('thesis-1w').className = w === '1w' ? 'expiry-btn active-expiry' : 'expiry-btn';
+  document.getElementById('thesis-3w').className = w === '3w' ? 'expiry-btn active-expiry' : 'expiry-btn';
+  if (lastScanText) runThesisAnalysis();
+}
+
+async function runThesisAnalysis() {
+  if (!lastScanTicker || !lastScanText) return;
+  document.getElementById('thesis-panel').style.display = 'block';
+  document.getElementById('thesis-ticker-label').textContent = lastScanTicker;
+  document.getElementById('thesis-loading').style.display = 'block';
+  document.getElementById('thesis-content').style.display = 'none';
+  document.getElementById('thesis-verdict').style.display = 'none';
+
+  const windowLabel = thesisWindow === '1w' ? '1 week (0DTE through weekly options)' : '3 weeks (weekly through monthly options)';
+
+  try {
+    const r = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        _model: 'claude-sonnet-4-6',
+        _useWebSearch: document.getElementById('chk-web')?.checked,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1200,
+        system: `You are a FirstSignal trade thesis analyst. Given a scan result, argue both sides (bullish vs bearish) for options plays within the specified timeframe, then give a consensus verdict.
+
+Format EXACTLY:
+TIMEFRAME: [window]
+CURRENT PRICE: [price]
+
+BULL CASE (CALLS):
+[3-4 specific reasons to buy calls — catalyst, flow, technicals, insider activity, senator trades]
+
+BEAR CASE (PUTS):  
+[3-4 specific reasons to buy puts — risks, resistance, insider sells, red flags]
+
+CONSENSUS: [CALLS / PUTS / WAIT]
+CONVICTION: [HIGH / MEDIUM / LOW]
+OPTIMAL STRIKE: [specific strike recommendation]
+OPTIMAL EXPIRY: [specific date]
+ENTRY RANGE: [premium range]
+HEDGE: [opposite play at 10% size]
+REASONING: [1-2 sentences on why consensus wins]`,
+        messages: [{ role: 'user', content: `Here is my scan data for ${lastScanTicker}:\n\n${lastScanText}\n\nBuild a trade thesis for a ${windowLabel} window. Include senator trades and insider activity in your analysis. Current date: ${TODAY}.` }]
+      })
+    });
+    const data = await r.json();
+    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || 'No response.';
+
+    const consensus = text.match(/CONSENSUS: (CALLS|PUTS|WAIT)/)?.[1];
+    const conviction = text.match(/CONVICTION: (HIGH|MEDIUM|LOW)/)?.[1];
+
+    const colored = text
+      .replace(/^(BULL CASE.*:)/m, '<span style="color:var(--accent);font-weight:600;">$1</span>')
+      .replace(/^(BEAR CASE.*:)/m, '<span style="color:var(--danger);font-weight:600;">$1</span>')
+      .replace(/^(CONSENSUS:|CONVICTION:|OPTIMAL STRIKE:|OPTIMAL EXPIRY:|ENTRY RANGE:|HEDGE:|REASONING:|TIMEFRAME:|CURRENT PRICE:)/gm, '<span style="color:var(--text-muted);">$1</span>');
+
+    document.getElementById('thesis-content').innerHTML = colored;
+    document.getElementById('thesis-content').style.display = 'block';
+    document.getElementById('thesis-loading').style.display = 'none';
+
+    // Big verdict
+    if (consensus) {
+      const color = consensus === 'CALLS' ? 'var(--accent)' : consensus === 'PUTS' ? 'var(--danger)' : 'var(--warn)';
+      const convColor = conviction === 'HIGH' ? color : conviction === 'MEDIUM' ? 'var(--warn)' : 'var(--text-muted)';
+      document.getElementById('thesis-verdict').innerHTML = `
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${color};">${consensus}</div>
+          <div>
+            <div style="font-family:var(--mono);font-size:11px;color:${convColor};font-weight:600;">${conviction || '—'} CONVICTION</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:2px;">${thesisWindow === '1w' ? '1-Week' : '3-Week'} Window</div>
+          </div>
+        </div>`;
+      document.getElementById('thesis-verdict').style.display = 'block';
+    }
+  } catch(err) {
+    document.getElementById('thesis-content').textContent = `Error: ${err.message}`;
+    document.getElementById('thesis-content').style.display = 'block';
+    document.getElementById('thesis-loading').style.display = 'none';
+  }
+}
+
+// ─── STW DISCORD FEED ───
+const STW_CHANNEL = '1330108200594309120';
+
+async function loadSTWFeed() {
+  const el = document.getElementById('stw-feed');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">Loading...</div>';
+  try {
+    const r = await fetch('/api/discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel_id: STW_CHANNEL, limit: 10 })
+    });
+    const data = await r.json();
+    if (data.error || !data.messages?.length) {
+      el.innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">No bot token configured — add DISCORD_BOT_TOKEN to Vercel env vars.</div>';
+      return;
+    }
+    el.innerHTML = data.messages.slice(0,8).map(m => {
+      const time = new Date(m.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',timeZone:'America/New_York'});
+      const content = m.content?.slice(0,80) || '';
+      // highlight tickers
+      const highlighted = content.replace(/\b([A-Z]{2,5})\b/g, (match) =>
+        match.length >= 2 && match.length <= 5 ? `<span style="color:var(--accent);cursor:pointer;" onclick="quickScan('${match}')">${match}</span>` : match
+      );
+      return `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;">
+        <div style="color:var(--text-dim);margin-bottom:2px;">${m.author} · ${time}</div>
+        <div style="color:var(--text);line-height:1.4;">${highlighted}</div>
+      </div>`;
+    }).join('');
+  } catch(err) {
+    el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${err.message}</div>`;
+  }
+}
+
+// Store scan data for thesis
+const _origScanStore = (ticker, text) => {
+  lastScanTicker = ticker;
+  lastScanText = text;
+};
 let strikeState = { direction: 'calls', expiry: '0dte', ticker: '', price: 0, scanData: {} };
 
 function initStrikeSelector(ticker, scanText) {
