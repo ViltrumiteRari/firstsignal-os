@@ -267,6 +267,22 @@
   .scan-dot:nth-child(1) { animation: pulse 1.2s ease-in-out infinite; }
   .scan-dot:nth-child(2) { animation: pulse 1.2s ease-in-out 0.4s infinite; }
   .scan-dot:nth-child(3) { animation: pulse 1.2s ease-in-out 0.8s infinite; }
+
+  /* EXPIRY BUTTONS */
+  .expiry-btn { flex:1; padding:8px; text-align:center; font-family:var(--mono); font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); cursor:pointer; border-right:1px solid var(--border); transition:all 0.15s; }
+  .expiry-btn:last-child { border-right:none; }
+  .expiry-btn:hover { background:var(--surface2); color:var(--text); }
+  .expiry-btn.active-expiry { background:var(--surface2); color:var(--text); }
+  .strike-btn { font-family:var(--mono); font-size:11px; padding:6px 12px; border:1px solid var(--border); border-radius:3px; cursor:pointer; color:var(--text-muted); background:var(--surface2); transition:all 0.15s; letter-spacing:0.05em; }
+  .strike-btn:hover { border-color:var(--border2); color:var(--text); }
+  .strike-btn.atm { border-color:var(--warn); color:var(--warn); }
+  .strike-btn.selected-call { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  .strike-btn.selected-put { background:rgba(229,64,64,0.08); border-color:var(--danger); color:var(--danger); }
+  .metric-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .metric-name { font-family:var(--mono); font-size:9px; color:var(--text-muted); width:80px; text-transform:uppercase; letter-spacing:0.08em; flex-shrink:0; }
+  .metric-track { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .metric-fill { height:100%; border-radius:2px; transition:width 0.4s ease; }
+  .metric-score { font-family:var(--mono); font-size:10px; font-weight:600; width:28px; text-align:right; }
 </style>
 </head>
 <body>
@@ -462,6 +478,48 @@
           <span class="os-btn os-btn-sm" style="background:transparent;border-color:var(--border2);color:var(--text-muted);" onclick="document.getElementById('scan-results').style.display='none'">Clear</span>
         </div>
       </div>
+      <!-- STRIKE SELECTOR -->
+      <div id="strike-selector" style="display:none;margin-top:16px;">
+        <div style="border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+          <!-- DIRECTION TOGGLE -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);">
+            <div id="dir-calls" onclick="setDirection('calls')" style="padding:16px;text-align:center;cursor:pointer;background:var(--accent-dim);border-right:1px solid var(--border);transition:all 0.15s;">
+              <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent);letter-spacing:0.05em;">CALLS</div>
+              <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:0.15em;margin-top:2px;">BULLISH ↑</div>
+            </div>
+            <div id="dir-puts" onclick="setDirection('puts')" style="padding:16px;text-align:center;cursor:pointer;transition:all 0.15s;">
+              <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text-muted);letter-spacing:0.05em;">PUTS</div>
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-top:2px;">BEARISH ↓</div>
+            </div>
+          </div>
+
+          <!-- EXPIRY SELECTOR -->
+          <div style="display:flex;gap:0;border-bottom:1px solid var(--border);">
+            <div class="expiry-btn active-expiry" id="exp-0dte" onclick="setExpiry('0dte')">0DTE</div>
+            <div class="expiry-btn" id="exp-week" onclick="setExpiry('week')">This Week</div>
+            <div class="expiry-btn" id="exp-2week" onclick="setExpiry('2week')">2 Weeks</div>
+            <div class="expiry-btn" id="exp-monthly" onclick="setExpiry('monthly')">Monthly</div>
+          </div>
+
+          <!-- STRIKE GRID -->
+          <div style="padding:14px;border-bottom:1px solid var(--border);">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-bottom:10px;text-transform:uppercase;">Strike Selection</div>
+            <div id="strike-grid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          </div>
+
+          <!-- RATING DISPLAY -->
+          <div id="strike-rating" style="display:none;padding:16px;border-bottom:1px solid var(--border);">
+            <!-- Big rating populated by JS -->
+          </div>
+
+          <!-- METRIC BARS -->
+          <div id="metric-bars" style="display:none;padding:14px;">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-bottom:10px;text-transform:uppercase;">Signal Breakdown</div>
+            <div id="metric-bars-inner"></div>
+          </div>
+        </div>
+      </div>
+
       <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
         <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px;">Finviz Screen</div>
         <a href="https://finviz.com/screener?v=111&s=ta_unusualvolume&f=cap_small,geo_usa,ta_sma200_pa,ta_sma50_pa&ft=4" target="_blank" class="os-btn os-btn-sm" style="display:inline-block;text-decoration:none;">↗ Open Finviz</a>
@@ -877,6 +935,9 @@ VERDICT: [1 sentence]`,
     // Store for watchlist add
     document.getElementById('scan-add-watchlist').dataset.ticker = ticker;
     document.getElementById('scan-add-watchlist').dataset.verdict = verdict;
+
+    // Init strike selector with scan data
+    initStrikeSelector(ticker, text);
   } catch(err) {
     clearInterval(interval);
     document.getElementById('scan-output').textContent = `Scan failed: ${err.message}`;
@@ -1046,6 +1107,212 @@ async function init() {
 }
 
 init();
+
+// ─── STRIKE SELECTOR ───
+let strikeState = { direction: 'calls', expiry: '0dte', ticker: '', price: 0, scanData: {} };
+
+function initStrikeSelector(ticker, scanText) {
+  strikeState.ticker = ticker;
+  // Parse price from scan output or estimate
+  const priceMatch = scanText.match(/\$(\d+\.?\d*)/);
+  strikeState.price = priceMatch ? parseFloat(priceMatch[1]) : 100;
+  strikeState.scanData = parseScanData(scanText);
+  strikeState.direction = strikeState.scanData.verdict === 'NO-GO' ? 'puts' : 'calls';
+
+  document.getElementById('strike-selector').style.display = 'block';
+  renderStrikeGrid();
+  updateDirectionUI();
+}
+
+function parseScanData(text) {
+  const get = (key) => { const m = text.match(new RegExp(key + ':\\s*(.+)')); return m ? m[1].trim() : ''; };
+  return {
+    verdict: get('STATUS').replace(/[^A-Z-]/g,''),
+    intradayMove: parseFloat(get('INTRADAY MOVE')) || 0,
+    flow: get('FLOW SIGNALS'),
+    technicals: get('TECHNICALS'),
+    thesis: get('THESIS'),
+    insider: get('INSIDER ACTIVITY'),
+  };
+}
+
+function setDirection(dir) {
+  strikeState.direction = dir;
+  updateDirectionUI();
+  if (strikeState.selectedStrike) renderRating(strikeState.selectedStrike);
+}
+
+function updateDirectionUI() {
+  const isCall = strikeState.direction === 'calls';
+  const callEl = document.getElementById('dir-calls');
+  const putEl = document.getElementById('dir-puts');
+  callEl.style.background = isCall ? 'var(--accent-dim)' : 'transparent';
+  callEl.querySelector('div').style.color = isCall ? 'var(--accent)' : 'var(--text-muted)';
+  callEl.querySelector('div:last-child').style.color = isCall ? 'var(--accent)' : 'var(--text-muted)';
+  putEl.style.background = !isCall ? 'rgba(229,64,64,0.08)' : 'transparent';
+  putEl.querySelector('div').style.color = !isCall ? 'var(--danger)' : 'var(--text-muted)';
+  putEl.querySelector('div:last-child').style.color = !isCall ? 'var(--danger)' : 'var(--text-muted)';
+  renderStrikeGrid();
+}
+
+function setExpiry(exp) {
+  strikeState.expiry = exp;
+  document.querySelectorAll('.expiry-btn').forEach(b => b.classList.remove('active-expiry'));
+  document.getElementById(`exp-${exp}`).classList.add('active-expiry');
+  if (strikeState.selectedStrike) renderRating(strikeState.selectedStrike);
+}
+
+function renderStrikeGrid() {
+  const price = strikeState.price;
+  const step = price < 20 ? 0.5 : price < 50 ? 1 : price < 100 ? 2 : price < 200 ? 5 : price < 500 ? 10 : 25;
+  const atm = Math.round(price / step) * step;
+  const strikes = [];
+  for (let i = -4; i <= 4; i++) strikes.push(+(atm + i * step).toFixed(2));
+
+  const grid = document.getElementById('strike-grid');
+  const isCall = strikeState.direction === 'calls';
+  grid.innerHTML = strikes.map(s => {
+    const isAtm = Math.abs(s - price) < step * 0.6;
+    const isOtm = isCall ? s > price : s < price;
+    const cls = `strike-btn${isAtm ? ' atm' : ''}`;
+    const label = `$${s}${isAtm ? ' ≈ATM' : isOtm ? ' OTM' : ' ITM'}`;
+    return `<div class="${cls}" onclick="selectStrike(${s})">${label}</div>`;
+  }).join('');
+  strikeState.selectedStrike = null;
+  document.getElementById('strike-rating').style.display = 'none';
+  document.getElementById('metric-bars').style.display = 'none';
+}
+
+function selectStrike(strike) {
+  strikeState.selectedStrike = strike;
+  document.querySelectorAll('.strike-btn').forEach(b => {
+    b.classList.remove('selected-call','selected-put');
+    if (parseFloat(b.textContent) === strike || b.textContent.startsWith('$'+strike)) {
+      b.classList.add(strikeState.direction === 'calls' ? 'selected-call' : 'selected-put');
+    }
+  });
+  renderRating(strike);
+}
+
+function renderRating(strike) {
+  const { direction, expiry, ticker, price, scanData } = strikeState;
+  const isCall = direction === 'calls';
+  const isOtm = isCall ? strike > price : strike < price;
+  const otmPct = Math.abs(strike - price) / price * 100;
+
+  // Scoring weights by expiry
+  const weights = {
+    '0dte':    { flow: 0.35, intraday: 0.30, technicals: 0.20, thesis: 0.15 },
+    'week':    { flow: 0.25, intraday: 0.20, technicals: 0.30, thesis: 0.25 },
+    '2week':   { flow: 0.20, intraday: 0.15, technicals: 0.30, thesis: 0.35 },
+    'monthly': { flow: 0.15, intraday: 0.10, technicals: 0.30, thesis: 0.45 }
+  };
+  const w = weights[expiry];
+
+  // Raw scores from scan data
+  const flowScore = scoreFlow(scanData.flow, isCall);
+  const intradayScore = scoreIntraday(scanData.intradayMove, isCall);
+  const techScore = scoreTechnicals(scanData.technicals, isCall);
+  const thesisScore = scoreThesis(scanData.thesis, isCall, scanData.verdict);
+
+  // OTM penalty
+  const otmPenalty = otmPct > 10 ? 0.7 : otmPct > 5 ? 0.85 : 1.0;
+
+  // Weighted total
+  const raw = (flowScore * w.flow + intradayScore * w.intraday + techScore * w.technicals + thesisScore * w.thesis) * otmPenalty;
+  const overall = Math.min(10, Math.max(1, Math.round(raw * 10) / 10));
+
+  // Determine verdict
+  let bigVerdict, verdictColor;
+  if (overall >= 7.5) { bigVerdict = isCall ? 'STRONG CALL' : 'STRONG PUT'; verdictColor = isCall ? 'var(--accent)' : 'var(--danger)'; }
+  else if (overall >= 5.5) { bigVerdict = isCall ? 'MODERATE CALL' : 'MODERATE PUT'; verdictColor = isCall ? 'var(--accent)' : 'var(--danger)'; }
+  else if (overall >= 4) { bigVerdict = 'WAIT'; verdictColor = 'var(--warn)'; }
+  else { bigVerdict = 'AVOID'; verdictColor = 'var(--text-muted)'; }
+
+  const expiryLabels = { '0dte': 'Today', 'week': 'This Week', '2week': '2 Weeks', 'monthly': 'Monthly' };
+  const contractLabel = `${ticker} $${strike}${isCall ? 'C' : 'P'} ${expiryLabels[expiry]}`;
+
+  // Big rating display
+  const ratingEl = document.getElementById('strike-rating');
+  ratingEl.style.display = 'block';
+  ratingEl.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;">${contractLabel}</div>
+      ${otmPct > 10 ? '<div style="font-family:var(--mono);font-size:9px;color:var(--warn);">⚠ Deep OTM — premium risk high</div>' : ''}
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div style="font-family:var(--mono);font-size:36px;font-weight:700;color:${verdictColor};line-height:1;">${bigVerdict}</div>
+      <div>
+        <div style="font-family:var(--mono);font-size:28px;font-weight:600;color:${verdictColor};line-height:1;">${overall.toFixed(1)}<span style="font-size:14px;color:var(--text-muted)">/10</span></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;margin-top:2px;">OVERALL RATING</div>
+      </div>
+    </div>`;
+
+  // Metric bars
+  const metrics = [
+    { name: 'Flow', score: flowScore, weight: w.flow },
+    { name: 'Intraday', score: intradayScore, weight: w.intraday },
+    { name: 'Technicals', score: techScore, weight: w.technicals },
+    { name: 'Thesis', score: thesisScore, weight: w.thesis },
+  ];
+
+  const barsEl = document.getElementById('metric-bars');
+  barsEl.style.display = 'block';
+  document.getElementById('metric-bars-inner').innerHTML = metrics.map(m => {
+    const pct = m.score * 100;
+    const color = pct >= 70 ? 'var(--accent)' : pct >= 45 ? 'var(--warn)' : 'var(--danger)';
+    return `<div class="metric-row">
+      <div class="metric-name">${m.name}</div>
+      <div class="metric-track"><div class="metric-fill" style="width:${pct}%;background:${color};"></div></div>
+      <div class="metric-score" style="color:${color};">${(m.score*10).toFixed(1)}</div>
+    </div>`;
+  }).join('');
+}
+
+// Scoring functions — parse scan text signals into 0-1 scores
+function scoreFlow(flowText, isCall) {
+  if (!flowText) return 0.5;
+  const t = flowText.toLowerCase();
+  if (t.includes('no unusual') || t.includes('no flow') || t.includes('none')) return 0.2;
+  if (t.includes('heavy call') || t.includes('large call') || t.includes('sweep')) return isCall ? 0.9 : 0.2;
+  if (t.includes('heavy put') || t.includes('large put')) return isCall ? 0.2 : 0.9;
+  if (t.includes('unusual') || t.includes('large block') || t.includes('notable')) return 0.75;
+  if (t.includes('mixed') || t.includes('moderate')) return 0.5;
+  return 0.55;
+}
+
+function scoreIntraday(movePct, isCall) {
+  const move = Math.abs(movePct);
+  if (move > 10) return 0.1; // too late
+  if (move > 7) return 0.3;
+  if (move > 5) return 0.5;
+  if (move > 2) return isCall ? (movePct > 0 ? 0.8 : 0.4) : (movePct < 0 ? 0.8 : 0.4);
+  return 0.65; // minimal move = pre-move entry
+}
+
+function scoreTechnicals(techText, isCall) {
+  if (!techText) return 0.5;
+  const t = techText.toLowerCase();
+  let score = 0.5;
+  if (t.includes('above 200') && t.includes('above 50')) score += isCall ? 0.2 : -0.1;
+  if (t.includes('below 200') || t.includes('below 50')) score += isCall ? -0.15 : 0.15;
+  if (t.includes('momentum') || t.includes('breakout')) score += isCall ? 0.15 : -0.1;
+  if (t.includes('oversold') || t.includes('support')) score += isCall ? 0.1 : -0.05;
+  if (t.includes('overbought') || t.includes('resistance')) score += isCall ? -0.1 : 0.1;
+  return Math.min(1, Math.max(0, score));
+}
+
+function scoreThesis(thesisText, isCall, verdict) {
+  if (verdict === 'GO') return isCall ? 0.85 : 0.3;
+  if (verdict === 'NO-GO') return isCall ? 0.15 : 0.8;
+  if (verdict === 'WATCHLIST') return 0.55;
+  if (!thesisText) return 0.5;
+  const t = thesisText.toLowerCase();
+  let score = 0.5;
+  if (t.includes('bullish') || t.includes('upside') || t.includes('catalyst')) score += isCall ? 0.2 : -0.1;
+  if (t.includes('bearish') || t.includes('downside') || t.includes('risk')) score += isCall ? -0.1 : 0.2;
+  return Math.min(1, Math.max(0, score));
+}
 </script>
 </body>
 </html>
