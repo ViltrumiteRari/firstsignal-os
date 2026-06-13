@@ -457,7 +457,7 @@
     <div id="section-regime" class="tab-content">
       <div class="section-header">
         <div class="section-title">Market Regime</div>
-        <span class="os-btn os-btn-sm" onclick="runRegimeScan()">↺ Refresh</span>
+        <span class="os-btn os-btn-sm" onclick="runRegimeScan(true)">↺ Refresh</span>
       </div>
 
       <!-- GEX QUICK STATS -->
@@ -1440,7 +1440,17 @@ async function fetchMacroTape(){
 // ─── MARKET REGIME (FlashAlpha GEX) ───
 let lastRegimeData = null;
 
-async function runRegimeScan() {
+async function runRegimeScan(forceRefresh = false) {
+  // Check Supabase cache first unless forced
+  if (!forceRefresh) {
+    try {
+      const cached = await sbGet('scans', `ticker=eq.REGIME&session_date=eq.${TODAY}&order=created_at.desc&limit=1`);
+      if (Array.isArray(cached) && cached.length && cached[0].raw_output) {
+        renderRegimeFromCache(JSON.parse(cached[0].raw_output));
+        return;
+      }
+    } catch(e) {}
+  }
   document.getElementById('regime-loading').style.display = 'block';
   document.getElementById('regime-narrative').style.display = 'none';
   document.getElementById('regime-empty').style.display = 'none';
@@ -1552,7 +1562,10 @@ BIAS: [BULLISH / BEARISH / NEUTRAL]`,
     document.getElementById('regime-timestamp').textContent = `Last updated: ${new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} EST`;
     document.getElementById('regime-narrative').style.display = 'block';
 
-    // Store regime context for ticker scans
+    // Cache to Supabase
+    const cachePayload = { gammaFlip, callWall, putWall, netGex, isPositiveGex, spyPrice, regimeLabel, regimeDesc, aiText, fetchedAt: new Date().toISOString() };
+    await sbInsert('scans', { ticker: 'REGIME', verdict: isPositiveGex ? 'GO' : 'NO-GO', raw_output: JSON.stringify(cachePayload), session_date: TODAY });
+
     window.currentRegime = { label: regimeLabel, gammaFlip, callWall, putWall, netGex, isPositiveGex, spyPrice };
 
   } catch(err) {
@@ -1561,6 +1574,34 @@ BIAS: [BULLISH / BEARISH / NEUTRAL]`,
   }
 
   document.getElementById('regime-loading').style.display = 'none';
+}
+
+function renderRegimeFromCache(d) {
+  document.getElementById('reg-gamma-flip').textContent = d.gammaFlip ? `$${d.gammaFlip}` : '—';
+  document.getElementById('reg-call-wall').textContent = d.callWall ? `$${d.callWall}` : '—';
+  document.getElementById('reg-put-wall').textContent = d.putWall ? `$${d.putWall}` : '—';
+  if (d.netGex !== undefined) {
+    const gexEl = document.getElementById('reg-net-gex');
+    gexEl.textContent = (d.isPositiveGex ? '+' : '') + (d.netGex/1e9).toFixed(2) + 'B';
+    gexEl.className = 'stat-val ' + (d.isPositiveGex ? 'up' : 'down');
+  }
+  const badgeEl = document.getElementById('regime-badge');
+  const color = d.isPositiveGex ? 'var(--accent)' : 'var(--danger)';
+  badgeEl.style.display = 'block';
+  badgeEl.style.borderColor = color;
+  document.getElementById('regime-label').textContent = d.regimeLabel || '—';
+  document.getElementById('regime-label').style.color = color;
+  document.getElementById('regime-desc').textContent = d.regimeDesc || '';
+  const aiText = d.aiText || '';
+  const summaryMatch = aiText.match(/REGIME SUMMARY:\n([\s\S]*?)(?=KEY LEVELS:|$)/);
+  const implMatch = aiText.match(/TRADING IMPLICATIONS:\n([\s\S]*?)(?=BIAS:|$)/);
+  document.getElementById('regime-spy-text').textContent = (summaryMatch?.[1] || aiText).trim();
+  document.getElementById('regime-implications').textContent = (implMatch?.[1] || '').trim();
+  const fetchedAt = d.fetchedAt ? new Date(d.fetchedAt).toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) : '—';
+  document.getElementById('regime-timestamp').textContent = `Cached from ${fetchedAt} EST — hit Refresh to use a FlashAlpha call`;
+  document.getElementById('regime-narrative').style.display = 'block';
+  document.getElementById('regime-empty').style.display = 'none';
+  window.currentRegime = { label: d.regimeLabel, gammaFlip: d.gammaFlip, callWall: d.callWall, putWall: d.putWall, netGex: d.netGex, isPositiveGex: d.isPositiveGex, spyPrice: d.spyPrice };
 }
 
 // ─── ADD RULE ───
@@ -1583,6 +1624,8 @@ async function init(){
   setInterval(fetchMacroTape,60000);
   loadSTWFeed();
   setInterval(loadSTWFeed,120000);
+  // Auto-load regime from cache on page load (no FlashAlpha call)
+  runRegimeScan(false);
 }
 init();
 </script>
