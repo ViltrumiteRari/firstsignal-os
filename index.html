@@ -337,6 +337,7 @@
     <a class="nav-item active" onclick="showSection('session', this)"><span class="nav-icon">◈</span> Today</a>
     <div class="nav-divider"></div>
     <div class="nav-section-label">Tools</div>
+    <a class="nav-item" onclick="showSection('regime', this)"><span class="nav-icon">◉</span> Regime</a>
     <a class="nav-item" onclick="showSection('scanner', this)"><span class="nav-icon">◎</span> Scanner</a>
     <a class="nav-item" onclick="showSection('log', this)"><span class="nav-icon">▤</span> Signal Log</a>
     <div class="nav-divider"></div>
@@ -449,6 +450,52 @@
           <input class="os-input" id="chat-input" placeholder="Ask anything — research a ticker, check a thesis, discuss a position..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
           <span class="os-btn" onclick="sendChat()" id="chat-send-btn">Send</span>
         </div>
+      </div>
+    </div>
+
+    <!-- MARKET REGIME -->
+    <div id="section-regime" class="tab-content">
+      <div class="section-header">
+        <div class="section-title">Market Regime</div>
+        <span class="os-btn os-btn-sm" onclick="runRegimeScan()">↺ Refresh</span>
+      </div>
+
+      <!-- GEX QUICK STATS -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;" id="regime-stats">
+        <div class="stat-box"><div class="stat-val" id="reg-gamma-flip">—</div><div class="stat-label">Gamma Flip</div></div>
+        <div class="stat-box"><div class="stat-val" id="reg-net-gex">—</div><div class="stat-label">Net GEX</div></div>
+        <div class="stat-box"><div class="stat-val" id="reg-call-wall">—</div><div class="stat-label">Call Wall</div></div>
+        <div class="stat-box"><div class="stat-val" id="reg-put-wall">—</div><div class="stat-label">Put Wall</div></div>
+      </div>
+
+      <!-- REGIME BADGE -->
+      <div id="regime-badge" style="display:none;margin-bottom:12px;padding:14px;border-radius:4px;border:1px solid var(--border);">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-bottom:6px;">MARKET REGIME</div>
+        <div id="regime-label" style="font-family:var(--mono);font-size:20px;font-weight:700;"></div>
+        <div id="regime-desc" style="font-size:11px;color:var(--text-muted);margin-top:4px;"></div>
+      </div>
+
+      <!-- LOADING -->
+      <div id="regime-loading" style="display:none;padding:20px 0;text-align:center;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.15em;">SCANNING MARKET REGIME...</div>
+        <div class="scan-dots" style="margin-top:8px;"><div class="scan-dot"></div><div class="scan-dot"></div><div class="scan-dot"></div></div>
+      </div>
+
+      <!-- NARRATIVE -->
+      <div id="regime-narrative" style="display:none;">
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-bottom:10px;text-transform:uppercase;">SPY Exposure Analysis</div>
+          <div id="regime-spy-text" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;"></div>
+        </div>
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;margin-bottom:10px;text-transform:uppercase;">Trading Implications</div>
+          <div id="regime-implications" style="font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text);white-space:pre-wrap;"></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);" id="regime-timestamp"></div>
+      </div>
+
+      <div id="regime-empty" style="font-family:var(--mono);font-size:11px;color:var(--text-muted);padding:20px 0;">
+        Hit Refresh to pull live GEX, gamma flip, and market regime from FlashAlpha.
       </div>
     </div>
 
@@ -1388,6 +1435,132 @@ async function fetchMacroTape(){
       });
     });
   }catch(e){}
+}
+
+// ─── MARKET REGIME (FlashAlpha GEX) ───
+let lastRegimeData = null;
+
+async function runRegimeScan() {
+  document.getElementById('regime-loading').style.display = 'block';
+  document.getElementById('regime-narrative').style.display = 'none';
+  document.getElementById('regime-empty').style.display = 'none';
+  document.getElementById('regime-badge').style.display = 'none';
+
+  try {
+    // Pull SPY GEX levels from FlashAlpha
+    const [levelsRes, summaryRes] = await Promise.all([
+      fetch('/api/flashalpha', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: '/v1/exposure/levels/SPY' }) }),
+      fetch('/api/flashalpha', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: '/v1/stock/SPY/summary' }) })
+    ]);
+
+    const levels = await levelsRes.json();
+    const summary = await summaryRes.json();
+
+    lastRegimeData = { levels, summary, fetchedAt: new Date().toISOString() };
+
+    // Populate stats
+    const gammaFlip = levels?.gamma_flip;
+    const callWall = levels?.call_wall;
+    const putWall = levels?.put_wall;
+    const netGex = levels?.net_gex;
+    const isPositiveGex = netGex > 0;
+
+    document.getElementById('reg-gamma-flip').textContent = gammaFlip ? `$${gammaFlip}` : '—';
+    document.getElementById('reg-call-wall').textContent = callWall ? `$${callWall}` : '—';
+    document.getElementById('reg-put-wall').textContent = putWall ? `$${putWall}` : '—';
+
+    if (netGex !== undefined) {
+      const gexLabel = (netGex / 1e9).toFixed(2) + 'B';
+      const gexEl = document.getElementById('reg-net-gex');
+      gexEl.textContent = (isPositiveGex ? '+' : '') + gexLabel;
+      gexEl.className = 'stat-val ' + (isPositiveGex ? 'up' : 'down');
+    }
+
+    // Regime label
+    const spyPrice = summary?.price || summary?.last;
+    const aboveFlip = spyPrice && gammaFlip ? spyPrice > gammaFlip : null;
+    let regimeLabel, regimeDesc, regimeColor;
+
+    if (isPositiveGex) {
+      regimeLabel = 'POSITIVE GEX — PINNING';
+      regimeDesc = 'Dealers are long gamma. Market tends to revert to mean, volatility suppressed. Good for range-bound plays.';
+      regimeColor = 'var(--accent)';
+    } else {
+      regimeLabel = 'NEGATIVE GEX — VOLATILE';
+      regimeDesc = 'Dealers are short gamma. Market tends to trend and extend moves. Momentum plays favored, be cautious with mean-reversion.';
+      regimeColor = 'var(--danger)';
+    }
+
+    const badgeEl = document.getElementById('regime-badge');
+    badgeEl.style.display = 'block';
+    badgeEl.style.borderColor = regimeColor;
+    document.getElementById('regime-label').textContent = regimeLabel;
+    document.getElementById('regime-label').style.color = regimeColor;
+    document.getElementById('regime-desc').textContent = regimeDesc;
+
+    // Build AI implications using Claude
+    const regimeContext = `SPY GEX Data:
+- Net GEX: ${netGex !== undefined ? (netGex/1e9).toFixed(2)+'B' : 'N/A'} (${isPositiveGex ? 'POSITIVE — dealers long gamma' : 'NEGATIVE — dealers short gamma'})
+- Gamma Flip: $${gammaFlip || 'N/A'}
+- Call Wall: $${callWall || 'N/A'}
+- Put Wall: $${putWall || 'N/A'}
+- SPY Price: $${spyPrice || 'N/A'}
+- Price vs Gamma Flip: ${aboveFlip === null ? 'unknown' : aboveFlip ? 'ABOVE flip (bullish positioning)' : 'BELOW flip (bearish zone)'}`;
+
+    const aiRes = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        _model: 'claude-haiku-4-5-20251001',
+        _useWebSearch: false,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 600,
+        system: `You are the FirstSignal market regime analyst. Given live GEX data, provide a concise regime summary and trading implications for a 0DTE/short-term options trader.
+
+Format EXACTLY:
+REGIME SUMMARY:
+[2-3 sentences on what the GEX data means for today's market behavior]
+
+KEY LEVELS:
+[Bullet list of gamma flip, call wall, put wall significance]
+
+TRADING IMPLICATIONS:
+[3-4 specific implications for 0DTE/weekly options plays today — what to favor, what to avoid, how to size]
+
+BIAS: [BULLISH / BEARISH / NEUTRAL]`,
+        messages: [{ role: 'user', content: `${regimeContext}\n\nDate: ${TODAY}. Give me the regime read and trading implications.` }]
+      })
+    });
+
+    const aiData = await aiRes.json();
+    const aiText = aiData.content?.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || '';
+
+    // Split into sections
+    const summaryMatch = aiText.match(/REGIME SUMMARY:\n([\s\S]*?)(?=KEY LEVELS:|$)/);
+    const implMatch = aiText.match(/TRADING IMPLICATIONS:\n([\s\S]*?)(?=BIAS:|$)/);
+    const biasMatch = aiText.match(/BIAS: (BULLISH|BEARISH|NEUTRAL)/);
+
+    document.getElementById('regime-spy-text').textContent = (summaryMatch?.[1] || aiText).trim();
+    document.getElementById('regime-implications').textContent = (implMatch?.[1] || '').trim();
+
+    if (biasMatch) {
+      const bias = biasMatch[1];
+      const bColor = bias === 'BULLISH' ? 'var(--accent)' : bias === 'BEARISH' ? 'var(--danger)' : 'var(--warn)';
+      document.getElementById('regime-desc').innerHTML += ` <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${bColor};">${bias}</span>`;
+    }
+
+    document.getElementById('regime-timestamp').textContent = `Last updated: ${new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} EST`;
+    document.getElementById('regime-narrative').style.display = 'block';
+
+    // Store regime context for ticker scans
+    window.currentRegime = { label: regimeLabel, gammaFlip, callWall, putWall, netGex, isPositiveGex, spyPrice };
+
+  } catch(err) {
+    document.getElementById('regime-empty').textContent = `Error: ${err.message}`;
+    document.getElementById('regime-empty').style.display = 'block';
+  }
+
+  document.getElementById('regime-loading').style.display = 'none';
 }
 
 // ─── ADD RULE ───
